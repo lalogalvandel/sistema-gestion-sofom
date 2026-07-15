@@ -2,30 +2,27 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from src.db import supabase
+from src.theme import (
+    aplicar_identidad_visual, encabezado_modulo, titulo_seccion,
+    dictamen, tarjeta_kpi
+)
 
 st.set_page_config(page_title="Control de Cobranza y Comisiones | SOFOM", layout="wide")
 
-# Estilos corporativos simétricos
-st.markdown("""
-    <style>
-    div[data-testid="metric-container"] {
-        background-color: #F8F9FA;
-        border: 1px solid #E9ECEF;
-        padding: 5% 5% 5% 8%;
-        border-radius: 5px;
-        border-left: 4px solid #2B6CB0;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# 1. Inyectar identidad visual y encabezado modular
+aplicar_identidad_visual()
 
-st.title("Panel Operativo de Cobranza y Distribución de Comisiones")
-st.markdown("Gestión transaccional de pagos en tiempo real y separación contable del rendimiento operativo.")
-st.divider()
+encabezado_modulo(
+    titulo="Panel Operativo de Cobranza y Comisiones",
+    subtitulo="Gestión transaccional de pagos en tiempo real y separación contable del rendimiento operativo.",
+    nombre_icono="banco",
+    insignia="COBRANZA ACTIVA"
+)
 
 # -----------------------------------------------------------------------------
-# SECCIÓN 1: KPI DE RECAUDACIÓN Y TU COMISIÓN (SIN AMONTONAMIENTO)
+# SECCIÓN 1: KPI DE RECAUDACIÓN Y TU COMISIÓN (CUADRÍCULA 2x2)
 # -----------------------------------------------------------------------------
-st.subheader("1. Estado de Cuenta Consolidado de la Entidad")
+titulo_seccion("tendencia", "1. Estado de Cuenta Consolidado de la Entidad")
 
 @st.cache_data(ttl=15)
 def obtener_resumen_cobranza():
@@ -44,29 +41,28 @@ def obtener_resumen_cobranza():
 
 recibido_hist, interes_hist, comision_hist, utilidad_hist = obtener_resumen_cobranza()
 
-# Cuadrícula simétrica 2x2
+# Cuadrícula simétrica 2x2 para evitar recortes numéricos
 k1, k2 = st.columns(2)
 with k1:
-    st.metric("Total Recaudado en Caja", f"${recibido_hist:,.2f}", delta="Flujo de capital e interés")
+    tarjeta_kpi("billetera", "Total Recaudado en Caja", f"${recibido_hist:,.2f}", "Flujo acumulado de capital e interés", "marino_800")
 with k2:
-    st.metric("Interés Real Cobrado", f"${interes_hist:,.2f}", delta="Base de cálculo de retribución")
+    tarjeta_kpi("porcentaje", "Interés Real Cobrado", f"${interes_hist:,.2f}", "Base de cálculo para retribuciones", "azul_600")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
 k3, k4 = st.columns(2)
 with k3:
-    st.metric("Tu Comisión Operativa (20%)", f"${comision_hist:,.2f}", delta="Ingreso Administrador del Fondo")
+    tarjeta_kpi("escudo", "Tu Comisión Operativa (20%)", f"${comision_hist:,.2f}", "Ingreso Administrador del Fondo", "dorado_600")
 with k4:
-    st.metric("Utilidad Neta Socios Capitalistas", f"${utilidad_hist:,.2f}", delta="65% Interés + Capital recuperado")
+    tarjeta_kpi("personas", "Utilidad Neta Socios Capitalistas", f"${utilidad_hist:,.2f}", "65% Interés + Capital recuperado", "verde_lago")
 
 st.divider()
 
 # -----------------------------------------------------------------------------
 # SECCIÓN 2: REGISTRO TRANSACCIONAL DE PAGOS QUINCENALES
 # -----------------------------------------------------------------------------
-st.subheader("2. Ventanilla de Cobranza y Registro de Abonos")
+titulo_seccion("caja", "2. Ventanilla de Cobranza y Registro de Abonos")
 
-# Consultar préstamos activos y sus clientes
 def obtener_prestamos_vigentes():
     try:
         res = supabase.table("prestamos").select("id_prestamo, monto_principal, cuota_fija_proyectada, clientes(nombre_completo, rfc)").eq("estatus_credito", "VIGENTE").execute()
@@ -98,12 +94,11 @@ with col_sel:
 with col_operacion:
     st.markdown("#### Cuota Quincenal por Recaudar")
     if credito_seleccionado in ["-- Sin Créditos Activos --", "-- Seleccione Crédito para Cobro --"]:
-        st.warning("Seleccione un expediente vigente para visualizar el siguiente vencimiento y procesar el pago.")
+        dictamen("alerta", "Selección Pendiente", "Seleccione un expediente vigente en el panel izquierdo para visualizar el siguiente vencimiento y procesar el pago.")
     else:
         datos_p = mapa_prestamos[credito_seleccionado]
         id_p = datos_p["id_prestamo"]
         
-        # Buscar la siguiente cuota pendiente en Supabase
         res_cuota = supabase.table("plan_amortizacion").select("*").eq("id_prestamo", id_p).eq("estatus_pago", "PENDIENTE").order("numero_cuota", desc=False).limit(1).execute()
         
         if res_cuota.data and len(res_cuota.data) > 0:
@@ -115,7 +110,6 @@ with col_operacion:
             abono_cap = float(cuota_pend["abono_capital"])
             interes_q = float(cuota_pend["interes_cobrado"])
             
-            # Cálculos de reparto en tiempo real para esta quincena
             comision_calc = round(interes_q * 0.20, 2)
             reserva_calc = round(interes_q * 0.15, 2)
             utilidad_calc = round(interes_q * 0.65 + abono_cap, 2)
@@ -131,7 +125,7 @@ with col_operacion:
                 st.markdown("---")
                 st.markdown("#### Desglose Automático de Retribución Operativa")
                 r1, r2, r3 = st.columns(3)
-                r1.metric("Tu Comisión (20%)", f"${comision_calc:,.2f}")
+                r1.metric("Comisión Operador (20%)", f"${comision_calc:,.2f}")
                 r2.metric("Reserva Riesgo (15%)", f"${reserva_calc:,.2f}")
                 r3.metric("Dividendo Socios (65%+Cap)", f"${utilidad_calc:,.2f}")
                 
@@ -142,10 +136,8 @@ with col_operacion:
                 if procesar:
                     with st.spinner("Actualizando tablas transaccionales en servidor..."):
                         try:
-                            # 1. Actualizar estatus de cuota en plan_amortizacion
                             supabase.table("plan_amortizacion").update({"estatus_pago": "PAGADO"}).eq("id_cuota", id_cuota).execute()
                             
-                            # 2. Insertar registro de recaudación y comisiones
                             payload_pago = {
                                 "id_cuota": id_cuota,
                                 "monto_recibido": monto_recibido_real,
@@ -156,19 +148,19 @@ with col_operacion:
                             }
                             supabase.table("cobranza_y_comisiones").insert(payload_pago).execute()
                             
-                            st.success(f"¡Pago de la Quincena N° {num_q} registrado exitosamente! Comisión operativa de ${comision_calc:,.2f} asignada.")
+                            dictamen("exito", "Pago Registrado Exitosamente", f"Quincena N° {num_q} abonada en base de datos. Comisión operativa de ${comision_calc:,.2f} asignada.")
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Error al procesar la transacción contable: {str(e)}")
+                            dictamen("peligro", "Error de Transacción", f"Fallo al procesar la cobranza en el servidor: {str(e)}")
         else:
-            st.success("¡Este crédito se encuentra completamente pagado! No existen quincenas pendientes en el servidor.")
+            dictamen("exito", "Crédito Liquidado", "¡Este expediente se encuentra completamente pagado! No existen quincenas pendientes en el servidor.")
 
 st.divider()
 
 # -----------------------------------------------------------------------------
 # SECCIÓN 3: BITÁCORA DE AUDITORÍA Y MOVIMIENTOS RECIENTES
 # -----------------------------------------------------------------------------
-st.subheader("3. Bitácora Institucional de Recaudación")
+titulo_seccion("documento", "3. Bitácora Institucional de Recaudación")
 try:
     res_bitacora = supabase.table("cobranza_y_comisiones").select("fecha_pago_real, monto_recibido, interes_real_cobrado, comision_operador, utilidad_socios").order("fecha_pago_real", desc=True).limit(15).execute()
     if res_bitacora.data and len(res_bitacora.data) > 0:
@@ -179,4 +171,4 @@ try:
     else:
         st.info("No hay transacciones de pago registradas en la bitácora del servidor.")
 except Exception as e:
-    st.error("No se pudo cargar el historial transaccional.")
+    dictamen("peligro", "Error de Consulta", "No se pudo cargar el historial transaccional.")

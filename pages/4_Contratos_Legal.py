@@ -4,25 +4,22 @@ from datetime import datetime
 from io import BytesIO
 from fpdf import FPDF
 from src.db import supabase
+from src.theme import (
+    aplicar_identidad_visual, encabezado_modulo, titulo_seccion,
+    dictamen, tarjeta_kpi
+)
 
 st.set_page_config(page_title="Emisión Legal | SOFOM", layout="wide")
 
-# Estilos corporativos para formatear tarjetas de métricas sin desbordamiento
-st.markdown("""
-    <style>
-    div[data-testid="metric-container"] {
-        background-color: #F8F9FA;
-        border: 1px solid #E9ECEF;
-        padding: 5% 5% 5% 8%;
-        border-radius: 5px;
-        border-left: 4px solid #1A365D;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# 1. Inyectar identidad visual
+aplicar_identidad_visual()
 
-st.title("Emisión de Instrumentos Legales y Pagarés")
-st.markdown("Generación automatizada de documentos ejecutivos mercantiles respaldados en servidor.")
-st.divider()
+encabezado_modulo(
+    titulo="Emisión de Instrumentos Legales y Pagarés",
+    subtitulo="Generación automatizada de documentos ejecutivos mercantiles respaldados en servidor.",
+    nombre_icono="documento_check",
+    insignia="JURÍDICO MERCANTIL"
+)
 
 # -----------------------------------------------------------------------------
 # CLASE PARA GENERACIÓN DE PDF LEGAL (FPDF2)
@@ -30,7 +27,7 @@ st.divider()
 class PagarePDF(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 14)
-        self.set_text_color(26, 54, 93)
+        self.set_text_color(26, 54, 93) # Azul marino institucional
         self.cell(0, 10, 'PAGARÉ INCONDICIONAL DE PAGO', 0, 1, 'C')
         self.set_font('Arial', 'I', 9)
         self.set_text_color(100, 100, 100)
@@ -97,7 +94,6 @@ def generar_pdf_pagare(datos_prestamo, datos_cliente, cuotas_df, lugar_expedicio
     pdf.ln(20)
     y_firma = pdf.get_y()
     
-    # Firma Deudor Principal
     pdf.line(20, y_firma, 85, y_firma)
     pdf.set_xy(20, y_firma + 2)
     pdf.set_font('Arial', 'B', 9)
@@ -108,7 +104,6 @@ def generar_pdf_pagare(datos_prestamo, datos_cliente, cuotas_df, lugar_expedicio
     pdf.set_xy(20, pdf.get_y())
     pdf.cell(65, 4, clean_text(f"RFC: {datos_cliente['rfc'].upper()}"), 0, 1, 'C')
     
-    # Firma Aval / Obligado Solidario (si se ingresó en el formulario)
     if aval_nombre and len(aval_nombre.strip()) > 3:
         pdf.line(115, y_firma, 180, y_firma)
         pdf.set_xy(115, y_firma + 2)
@@ -163,7 +158,7 @@ def generar_pdf_pagare(datos_prestamo, datos_cliente, cuotas_df, lugar_expedicio
 # -----------------------------------------------------------------------------
 # INTERFAZ DE USUARIO DEL MÓDULO LEGAL
 # -----------------------------------------------------------------------------
-st.subheader("1. Selección de Expediente para Emisión Legal")
+titulo_seccion("balanza", "1. Selección de Expediente para Emisión Legal")
 
 def obtener_creditos_formalizados():
     try:
@@ -194,7 +189,7 @@ with col_sel:
 with col_config:
     st.markdown("#### Parámetros Jurídicos Adicionales")
     if contrato_sel in ["-- Sin Expedientes Registrados --", "-- Seleccione un Contrato --"]:
-        st.warning("Seleccione un expediente de la lista para cargar las cláusulas del pagaré.")
+        dictamen("alerta", "Expediente Requerido", "Seleccione un contrato en el menú desplegable para cargar las cláusulas del pagaré mercantil.")
     else:
         datos_contrato = mapa_legal[contrato_sel]
         datos_cli = datos_contrato.get("clientes", {})
@@ -212,20 +207,20 @@ with col_config:
             st.markdown("---")
             st.markdown("#### Resumen de Obligación por Contratar")
             
-            # Cuadrícula simétrica 2x2 para eliminar el amontonamiento de texto y cifras
+            # Cuadrícula simétrica 2x2 para evitar recortes de texto
             m1, m2 = st.columns(2)
             with m1:
-                st.metric("Principal Otorgado", f"${datos_contrato['monto_principal']:,.2f}")
+                tarjeta_kpi("billetera", "Principal Otorgado", f"${datos_contrato['monto_principal']:,.2f}", "Capital original prestado", "marino_800")
             with m2:
-                st.metric("Total a Pagar", f"${datos_contrato['monto_total_recaudar']:,.2f}")
+                tarjeta_kpi("banco", "Total a Pagar", f"${datos_contrato['monto_total_recaudar']:,.2f}", "Capital + Interés pactado", "dorado_600")
                 
             st.markdown("<br>", unsafe_allow_html=True)
             
             m3, m4 = st.columns(2)
             with m3:
-                st.metric("Plazo Pactado", f"{datos_contrato['plazo_quincenas']} quincenas")
+                tarjeta_kpi("calendario", "Plazo Pactado", f"{datos_contrato['plazo_quincenas']} quincenas", "Calendario de vencimientos", "azul_600")
             with m4:
-                st.metric("Tasa Moratoria", f"{float(datos_contrato['tasa_interes_mensual'])*200:.1f}% mensual")
+                tarjeta_kpi("alerta_triangulo", "Tasa Moratoria", f"{float(datos_contrato['tasa_interes_mensual'])*200:.1f}% mensual", "Aplicable sobre saldos vencidos", "peligro")
             
             generar_doc = st.form_submit_button("Generar Pagaré Ejecutivo y Anexo (PDF)", use_container_width=True)
             
@@ -234,7 +229,7 @@ with col_config:
                     try:
                         res_tabla = supabase.table("plan_amortizacion").select("*").eq("id_prestamo", id_p).order("numero_cuota", desc=False).execute()
                         if not res_tabla.data or len(res_tabla.data) == 0:
-                            st.error("No se encontró la tabla de amortización para este préstamo en el servidor.")
+                            dictamen("peligro", "Error de Compilación", "No se encontró la tabla de amortización para este préstamo en el servidor.")
                         else:
                             df_cuotas_legal = pd.DataFrame(res_tabla.data)
                             
@@ -251,16 +246,16 @@ with col_config:
                                 "bytes": bytes(pdf_bytes),
                                 "nombre_archivo": f"Pagare_Ejecutivo_{datos_cli['rfc']}_{str(id_p)[:8]}.pdf"
                             }
-                            st.success("Instrumento legal compilado exitosamente en calidad de impresión.")
+                            dictamen("exito", "Instrumento Compilado Exitosamente", "El documento PDF ha sido generado en calidad de impresión con sus respectivas cláusulas y anexos.")
                     except Exception as e:
-                        st.error(f"Fallo durante la compilación del documento PDF: {str(e)}")
+                        dictamen("peligro", "Error en Generación", f"Fallo durante la compilación del documento PDF: {str(e)}")
 
 st.divider()
 
 # -----------------------------------------------------------------------------
-# SECCIÓN 3: DESCARGA DE DOCUMENTO LEGAL
+# SECCIÓN 2: DESCARGA DE DOCUMENTO LEGAL
 # -----------------------------------------------------------------------------
-st.subheader("2. Emisión y Descarga del Instrumento")
+titulo_seccion("documento", "2. Emisión y Descarga del Instrumento")
 
 if "pdf_generado" in st.session_state and st.session_state["pdf_generado"]:
     doc_info = st.session_state["pdf_generado"]
