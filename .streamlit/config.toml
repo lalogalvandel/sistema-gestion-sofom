@@ -1,1 +1,10 @@
+[theme]
+base = "light"
+primaryColor = "#1A365D"                   # Azul marino institucional para acentos y botones
+backgroundColor = "#F8FAFC"                # Fondo general ejecutivo (gris-blanco muy suave)
+secondaryBackgroundColor = "#FFFFFF"       # Fondo de la barra lateral y menús (blanco puro y limpio)
+textColor = "#0F172A"                      # Texto principal pizarra oscuro (máxima legibilidad)
+font = "sans serif"
 
+[layout]
+wideMode = true
