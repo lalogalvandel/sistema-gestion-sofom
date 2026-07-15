@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
+# Configuración de la página
 st.set_page_config(page_title="Motor de Scoring | SOFOM", page_icon="⚡", layout="wide")
 
 # Inicializar memoria temporal si no hay conexión a base de datos aún
@@ -9,7 +10,7 @@ if 'cartera_temporal' not in st.session_state:
     st.session_state.cartera_temporal = []
 
 st.title("⚡ Motor Cuantitativo de Admisión y Scoring")
-st.markdown("Evaluación algorítmica para mitigar la selección adversa en créditos de $5,000 a $15,000 MXN.")
+st.markdown("Evaluación algorítmica para mitigar la selección adversa en créditos de $5,000 a $30,000 MXN.")
 st.divider()
 
 col_form, col_res = st.columns([1, 1.2])
@@ -29,7 +30,7 @@ with col_form:
         
         st.markdown("---")
         st.markdown("#### Condiciones del Crédito")
-        monto = st.number_input("Monto Solicitado ($):", min_value=3000.0, max_value=30000.0, value=15000.0, step=1000.0)
+        monto = st.number_input("Monto Solicitado ($):", min_value=3000.0, max_value=50000.0, value=15000.0, step=1000.0)
         plazo_quincenas = st.selectbox("Plazo de Pago (Quincenas):", options=[6, 12, 18, 24], index=1)
         tasa_mensual = st.number_input("Tasa de Interés Mensual (%):", min_value=1.0, max_value=15.0, value=6.0, step=0.5) / 100.0
         
@@ -38,11 +39,11 @@ with col_form:
 with col_res:
     st.subheader("2. Resultado del Algoritmo y Semáforo")
     
-    # Cálculos matemáticos
+    # Cálculos matemáticos de liquidez
     flujo_libre = ingreso - gastos - deudas
     capacidad_pago_quincenal = (flujo_libre * 0.30) / 2.0
     
-    # Cálculo de cuota quincenal (Sistema Francés)
+    # Cálculo de cuota quincenal (Sistema Francés amortizado)
     tasa_quincenal = tasa_mensual / 2.0
     if tasa_quincenal > 0:
         cuota_quincenal = monto * (tasa_quincenal * (1 + tasa_quincenal)**plazo_quincenas) / ((1 + tasa_quincenal)**plazo_quincenas - 1)
@@ -51,7 +52,7 @@ with col_res:
         
     ratio_compromiso = cuota_quincenal / (flujo_libre / 2.0) if flujo_libre > 0 else 1.0
     
-    # Mostrar métricas intermedias
+    # Mostrar métricas intermedias en tarjetas
     c1, c2, c3 = st.columns(3)
     c1.metric("Flujo Libre Real", f"${flujo_libre:,.2f} MXN")
     c2.metric("Capacidad Máx. (30%)", f"${capacidad_pago_quincenal:,.2f} MXN")
@@ -59,7 +60,7 @@ with col_res:
     
     st.markdown("---")
     
-    # Semáforo de Decisión
+    # Lógica del Semáforo de Decisión
     if flujo_libre <= 0:
         st.error("🚨 **RECHAZADO — DÉFICIT DE FLUJO:** El solicitante no cuenta con liquidez para asumir nuevas deudas.")
         status_code = "RECHAZADO"
@@ -75,7 +76,7 @@ with col_res:
         
     st.divider()
     
-    # Botón de Guardado
+    # Botón de Guardado en Memoria Temporal
     if st.button("📁 Registrar Cliente en Cartera Operativa", type="primary", use_container_width=True):
         nuevo_registro = {
             "Cliente": nombre,
@@ -88,7 +89,7 @@ with col_res:
         st.session_state.cartera_temporal.append(nuevo_registro)
         st.toast("¡Cliente registrado exitosamente en memoria temporal! 🚀")
 
-# Mostrar tabla inferior si hay clientes guardados
+# Mostrar tabla inferior si hay clientes evaluados y guardados
 if st.session_state.cartera_temporal:
     st.markdown("### 📋 Historial de Evaluaciones de la Sesión")
     df_memoria = pd.DataFrame(st.session_state.cartera_temporal)
