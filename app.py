@@ -2,26 +2,31 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from src.db import supabase
+from src.theme import (
+    PALETA, aplicar_identidad_visual, encabezado_modulo,
+    tarjeta_kpi, titulo_seccion, tarjeta_protocolo, plantilla_plotly,
+    SECUENCIA_GRAFICAS
+)
 
+# Configuración institucional de página
 st.set_page_config(
     page_title="Sistema de Gestión SOFOM - Core Engine",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Estilos corporativos limpios y formales
-st.markdown("""
-    <style>
-    .main-header {font-size: 26px; font-weight: bold; color: #1A365D; margin-bottom: 0px;}
-    .sub-header {font-size: 15px; color: #4A5568; font-style: italic; margin-top: 0px;}
-    </style>
-""", unsafe_allow_html=True)
+# 1. Inyectar el motor visual institucional
+aplicar_identidad_visual()
 
-st.markdown('<p class="main-header">Suite Operativa y Gestión de Crédito (SOFOM E.N.R.)</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Fase de Validación — Control Institucional en Tiempo Real</p>', unsafe_allow_html=True)
-st.divider()
+# 2. Encabezado editorial sin emojis, con icono SVG lineal e insignia
+encabezado_modulo(
+    titulo="Suite Operativa y Gestión de Crédito",
+    subtitulo="Fase de Validación — Control Institucional en Tiempo Real y Trazabilidad en Servidor",
+    nombre_icono="banco",
+    insignia="SOFOM E.N.R."
+)
 
-# Consulta transaccional en tiempo real para calcular KPIs
+# 3. Consulta transaccional en tiempo real para KPIs
 @st.cache_data(ttl=30)
 def obtener_kpis_cartera():
     try:
@@ -47,40 +52,77 @@ def obtener_kpis_cartera():
 total_cli, cap_colocado, prest_activos, int_proyectado = obtener_kpis_cartera()
 fondo_prueba_total = 150000.0
 capital_disponible = fondo_prueba_total - cap_colocado
+comision_proyectada = int_proyectado * 0.20
 
-st.subheader("Estado General del Fondo y Métricas de Cartera")
+titulo_seccion("tendencia", "Estado General del Fondo y Métricas de Cartera")
 
-col1, col2, col3, col4 = st.columns(4)
+# 4. Cuadrícula 2x2 para evitar recortes numéricos en montos grandes
+col1, col2 = st.columns(2)
 with col1:
-    st.metric(label="Capital Colocado (Activo)", value=f"${cap_colocado:,.2f}", delta=f"Disponible: ${capital_disponible:,.2f}")
+    tarjeta_kpi(
+        nombre_icono="billetera",
+        etiqueta="Capital Colocado (Activo)",
+        valor=f"${cap_colocado:,.2f}",
+        contexto=f"Fondo Disponible: ${capital_disponible:,.2f} MXN",
+        acento="marino_800"
+    )
 with col2:
-    st.metric(label="Créditos Formalizados", value=f"{prest_activos} contratos", delta=f"{total_cli} clientes en base")
+    tarjeta_kpi(
+        nombre_icono="documento_check",
+        etiqueta="Créditos Formalizados",
+        valor=f"{prest_activos} contratos",
+        contexto=f"Respaldados por {total_cli} expedientes en base de datos",
+        acento="azul_600"
+    )
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+col3, col4 = st.columns(2)
 with col3:
-    st.metric(label="Interés Bruto Proyectado / Mes", value=f"${int_proyectado:,.2f}", delta="Rotación continua")
+    tarjeta_kpi(
+        nombre_icono="porcentaje",
+        etiqueta="Interés Bruto Proyectado / Mes",
+        valor=f"${int_proyectado:,.2f}",
+        contexto="Rendimiento sobre cartera vigente en rotación",
+        acento="dorado_600"
+    )
 with col4:
-    comision_proyectada = int_proyectado * 0.20
-    st.metric(label="Comisión Operativa Proyectada (20%)", value=f"${comision_proyectada:,.2f}", delta="Ingreso Administrador")
+    tarjeta_kpi(
+        nombre_icono="escudo",
+        etiqueta="Comisión Operativa Proyectada (20%)",
+        valor=f"${comision_proyectada:,.2f}",
+        contexto="Retribución mensual por administración de cartera",
+        acento="verde_lago"
+    )
 
 st.divider()
 
-# Sección de Protocolos y Distribución de Capital
-col_left, col_right = st.columns([1, 1])
+# 5. Sección inferior: Protocolo y Gráfica con Plantilla Institucional
+col_left, col_right = st.columns([1.1, 0.9])
 
 with col_left:
-    st.markdown("### Protocolo Institucional y Cumplimiento")
-    st.info("""
-    **1. Evaluación Paramétrica:** Todo crédito otorgado pasó estrictamente por el filtro algorítmico de liquidez (Regla del 30%) en el Módulo de Admisión.
-    
-    **2. Conciliación Matemáticamente Exacta:** Los calendarios de amortización se calculan con ajuste de cierre, eliminando descuadres contables de centavos.
-    
-    **3. Trazabilidad Inmutable:** Cada pagaré y contrato legal emitido se respalda en una transacción única dentro del servidor PostgreSQL.
-    """)
+    items_protocolo = [
+        ("Evaluación Paramétrica Estricta", "Todo crédito otorgado aprueba el filtro algorítmico de liquidez (Regla del 30%) en el Módulo de Admisión antes de su pase a firma."),
+        ("Conciliación Matemáticamente Exacta", "Los calendarios de amortización operan con ajuste al cierre, eliminando descuadres contables de centavos en el saldo insoluto final."),
+        ("Trazabilidad Inmutable", "Cada pagaré, anexo de pago y evento de cobranza se respalda transaccionalmente en el servidor relacional PostgreSQL.")
+    ]
+    tarjeta_protocolo(
+        titulo="Protocolo de Control y Cumplimiento Normativo",
+        items=items_protocolo,
+        nombre_icono="balanza"
+    )
 
 with col_right:
-    st.markdown("### Distribución del Retorno por Intereses")
-    labels = ['Dividendos Socios Capitalistas (65%)', 'Comisión Operadora (20%)', 'Reserva de Morosidad (15%)']
+    titulo_seccion("porcentaje", "Distribución del Retorno por Intereses")
+    labels = ['Dividendos Socios (65%)', 'Comisión Operadora (20%)', 'Reserva Morosidad (15%)']
     values = [65, 20, 15]
-    fig = px.pie(names=labels, values=values, color_discrete_sequence=['#1A365D', '#2B6CB0', '#81E6D9'])
-    fig.update_traces(textposition='inside', textinfo='percent+label')
-    fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=220, showlegend=False)
+    
+    fig = px.pie(
+        names=labels, 
+        values=values, 
+        color_discrete_sequence=[PALETA["marino_800"], PALETA["azul_600"], PALETA["dorado_600"]]
+    )
+    fig.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='#FFFFFF', width=2)))
+    fig = plantilla_plotly(fig, altura=240, leyenda=False)
+    
     st.plotly_chart(fig, use_container_width=True)
