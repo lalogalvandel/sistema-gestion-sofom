@@ -151,7 +151,7 @@ with col_operacion:
                 # Blindaje contra colisión de LaTeX: usamos \$ antes de cada variable monetaria
                 if monto_recibido_real < monto_cuota_teorico:
                     diferencia = monto_cuota_teorico - monto_recibido_real
-                    dictamen("alerta", "Aviso de Abono Irregular", f"El cliente pagó \${diferencia:,.2f} MXN menos que la cuota pactada. Se cubrió el interés al 100% y el abono a capital se redujo a \${abono_cap_real:,.2f} MXN para no desbalancear la caja del fondo.")
+                    dictamen("alerta", "Aviso de Abono Irregular", f"El cliente pagó ${diferencia:,.2f} MXN menos que la cuota pactada. Se cubrió el interés al 100% y el abono a capital se redujo a ${abono_cap_real:,.2f} MXN para no desbalancear la caja del fondo.")
                 
                 st.markdown("<br>", unsafe_allow_html=True)
                 procesar = st.form_submit_button("Registrar Pago y Ejecutar Reparto Contable", use_container_width=True)
@@ -177,7 +177,7 @@ with col_operacion:
                             }
                             supabase.table("cobranza_y_comisiones").insert(payload_pago).execute()
                             
-                            dictamen("exito", f"Transacción Exitosa ({estatus_asignar})", f"Quincena N° {num_q} registrada con ingreso en caja de \${monto_recibido_real:,.2f} MXN. El reparto a socios ha sido conciliado sin generar déficit.")
+                            dictamen("exito", f"Transacción Exitosa ({estatus_asignar})", f"Quincena N° {num_q} registrada con ingreso en caja de ${monto_recibido_real:,.2f} MXN. El reparto a socios ha sido conciliado sin generar déficit.")
                             st.rerun()
                         except Exception as e:
                             dictamen("peligro", "Error de Transacción", f"Fallo al procesar la cobranza en el servidor: {str(e)}")
