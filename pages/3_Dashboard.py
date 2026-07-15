@@ -119,14 +119,11 @@ with col_operacion:
                 st.markdown("---")
                 monto_recibido_real = st.number_input("Confirmar Monto Real Recibido en ventanilla ($):", min_value=1.0, value=monto_cuota_teorico, step=100.0)
                 
-                # ---------------------------------------------------------------------
-# LÓGICA FINANCIERA DE PRELACIÓN DE PAGO (BLINDAJE DE CAJA)
-# ---------------------------------------------------------------------
+                # Lógica de Prelación de Pago
                 if monto_recibido_real >= interes_q_teorico:
                     interes_real = interes_q_teorico
                     abono_cap_real = round(monto_recibido_real - interes_real, 2)
                 else:
-                    # Si paga menos que el interés, todo va a interés y cero a capital
                     interes_real = monto_recibido_real
                     abono_cap_real = 0.0
                     
@@ -135,30 +132,41 @@ with col_operacion:
                 utilidad_calc = round((interes_real * 0.65) + abono_cap_real, 2)
                 
                 st.markdown("#### Desglose Dinámico sobre Efectivo Recibido")
-                r1, r2, r3 = st.columns(3)
-                r1.metric("Tu Comisión (20%)", f"${comision_calc:,.2f}")
-                r2.metric("Reserva Riesgo (15%)", f"${reserva_calc:,.2f}")
-                r3.metric("Flujo Real Socios", f"${utilidad_calc:,.2f}", delta=f"Cap. cobrado: ${abono_cap_real:,.2f}")
                 
+                # Cuadrícula 2x2 con Tarjetas KPI para eliminar recortes numéricos ($1,88...)
+                r1, r2 = st.columns(2)
+                with r1:
+                    tarjeta_kpi("escudo", "Tu Comisión (20%)", f"${comision_calc:,.2f}", "Retribución por administración", "dorado_600")
+                with r2:
+                    tarjeta_kpi("alerta_triangulo", "Reserva Riesgo (15%)", f"${reserva_calc:,.2f}", "Fondo de protección contra morosidad", "alerta")
+                    
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                r3, r4 = st.columns(2)
+                with r3:
+                    tarjeta_kpi("personas", "Flujo Real Socios", f"${utilidad_calc:,.2f}", f"Capital cobrado: ${abono_cap_real:,.2f}", "verde_lago")
+                with r4:
+                    tarjeta_kpi("billetera", "Efectivo en Caja", f"${monto_recibido_real:,.2f}", f"Abono físico de Quincena {num_q}", "marino_800")
+                
+                # Blindaje contra colisión de LaTeX: usamos \$ antes de cada variable monetaria
                 if monto_recibido_real < monto_cuota_teorico:
-                    st.warning(f"⚠️ **Aviso de Abono Irregular:** El cliente pagó **${monto_cuota_teorico - monto_recibido_real:,.2f}** menos que la cuota pactada. Se cubrió el interés y el capital se redujo a **${abono_cap_real:,.2f}** para no desbalancear el fondo.")
+                    diferencia = monto_cuota_teorico - monto_recibido_real
+                    dictamen("alerta", "Aviso de Abono Irregular", f"El cliente pagó \${diferencia:,.2f} MXN menos que la cuota pactada. Se cubrió el interés al 100% y el abono a capital se redujo a \${abono_cap_real:,.2f} MXN para no desbalancear la caja del fondo.")
                 
+                st.markdown("<br>", unsafe_allow_html=True)
                 procesar = st.form_submit_button("Registrar Pago y Ejecutar Reparto Contable", use_container_width=True)
                 
                 if procesar:
                     with st.spinner("Actualizando tablas transaccionales en servidor..."):
                         try:
-                            # 1. Actualizar estatus en plan_amortizacion
-                            # Si pagó el 100% de la cuota se marca PAGADO, si fue menos se marca PARCIAL
                             estatus_asignar = "PAGADO" if monto_recibido_real >= monto_cuota_teorico else "PAGO PARCIAL"
                             
                             supabase.table("plan_amortizacion").update({
                                 "estatus_pago": estatus_asignar,
-                                "abono_capital": abono_cap_real, # Guardamos el capital real que aportó
+                                "abono_capital": abono_cap_real,
                                 "interes_cobrado": interes_real
                             }).eq("id_cuota", id_cuota).execute()
                             
-                            # 2. Insertar registro contable real en cobranza
                             payload_pago = {
                                 "id_cuota": id_cuota,
                                 "monto_recibido": monto_recibido_real,
@@ -169,7 +177,7 @@ with col_operacion:
                             }
                             supabase.table("cobranza_y_comisiones").insert(payload_pago).execute()
                             
-                            dictamen("exito", f"Transacción Exitosa ({estatus_asignar})", f"Quincena N° {num_q} registrada con ingreso en caja de ${monto_recibido_real:,.2f}. El reparto a socios ha sido conciliado sin generar déficit.")
+                            dictamen("exito", f"Transacción Exitosa ({estatus_asignar})", f"Quincena N° {num_q} registrada con ingreso en caja de \${monto_recibido_real:,.2f} MXN. El reparto a socios ha sido conciliado sin generar déficit.")
                             st.rerun()
                         except Exception as e:
                             dictamen("peligro", "Error de Transacción", f"Fallo al procesar la cobranza en el servidor: {str(e)}")
