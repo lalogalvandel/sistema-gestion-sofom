@@ -3,25 +3,22 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from src.db import supabase, formalizar_credito_y_amortización
+from src.theme import (
+    aplicar_identidad_visual, encabezado_modulo, titulo_seccion,
+    dictamen, tarjeta_kpi
+)
 
 st.set_page_config(page_title="Amortización y Formalización | SOFOM", layout="wide")
 
-# Estilos corporativos para evitar desbordamiento y amontonamiento en tarjetas numéricas
-st.markdown("""
-    <style>
-    div[data-testid="metric-container"] {
-        background-color: #F8F9FA;
-        border: 1px solid #E9ECEF;
-        padding: 5% 5% 5% 8%;
-        border-radius: 5px;
-        border-left: 4px solid #1A365D;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# 1. Inyectar identidad visual
+aplicar_identidad_visual()
 
-st.title("Motor de Amortización y Formalización de Contratos")
-st.markdown("Generación de calendarios bajo el Sistema Francés y registro transaccional en PostgreSQL.")
-st.divider()
+encabezado_modulo(
+    titulo="Motor de Amortización y Formalización",
+    subtitulo="Generación de calendarios bajo el Sistema Francés y registro transaccional en PostgreSQL.",
+    nombre_icono="calendario",
+    insignia="SISTEMA FRANCÉS"
+)
 
 def obtener_clientes_aprobados():
     try:
@@ -42,7 +39,7 @@ for c in clientes_db:
 col_param, col_resumen = st.columns([1, 1.4])
 
 with col_param:
-    st.subheader("Parámetros del Crédito")
+    titulo_seccion("personas", "1. Parámetros del Crédito")
     
     index_defecto = 0
     if "expediente_activo" in st.session_state and st.session_state["expediente_activo"]:
@@ -84,10 +81,10 @@ with col_param:
         calcular = st.form_submit_button("Calculadora de Amortización Exacta", use_container_width=True)
 
 with col_resumen:
-    st.subheader("Dictamen Matemático y Contable")
+    titulo_seccion("balanza", "2. Dictamen Matemático y Contable")
     
     if seleccion == "-- Seleccione un Deudor Aprobado --":
-        st.warning("Debe seleccionar un cliente aprobado para generar la tabla y proceder a la formalización.")
+        dictamen("alerta", "Selección Pendiente", "Debe seleccionar un cliente aprobado en el menú desplegable para generar la tabla de amortización y proceder a la formalización contractual.")
     else:
         tasa_quincenal = tasa_mensual / 2.0
         
@@ -134,27 +131,27 @@ with col_resumen:
         df_amortizacion = pd.DataFrame(tabla_pagos)
         total_recaudar = round(total_capital + total_interes, 2)
         
-        # Cuadrícula simétrica 2x2 para eliminar el amontonamiento de texto y cifras
+        # Cuadrícula simétrica 2x2 con tarjetas KPI institucionales
         m1, m2 = st.columns(2)
         with m1:
-            st.metric("Capital Otorgado", f"${total_capital:,.2f}")
+            tarjeta_kpi("billetera", "Capital Otorgado", f"${total_capital:,.2f}", "Monto original del desembolso", "marino_800")
         with m2:
-            st.metric("Interés Total Proyectado", f"${total_interes:,.2f}")
+            tarjeta_kpi("porcentaje", "Interés Total Proyectado", f"${total_interes:,.2f}", "Costo financiero a lo largo del plazo", "dorado_600")
             
         st.markdown("<br>", unsafe_allow_html=True)
         
         m3, m4 = st.columns(2)
         with m3:
-            st.metric("Monto Total a Recaudar", f"${total_recaudar:,.2f}")
+            tarjeta_kpi("banco", "Monto Total a Recaudar", f"${total_recaudar:,.2f}", "Suma exacta del pagaré ejecutivo", "azul_600")
         with m4:
-            st.metric("Cuota Quincenal Base", f"${cuota_fija:,.2f}")
+            tarjeta_kpi("calendario", "Cuota Quincenal Base", f"${cuota_fija:,.2f}", "Pago recurrente constante", "verde_lago")
         
         st.markdown("---")
         
         if total_capital == round(monto_principal, 2):
-            st.success("Verificación Contable Exitosa: Conciliación de capital exacta. Saldo insoluto al cierre liquidado a $0.00.")
+            dictamen("exito", "Verificación Contable Exitosa", "Conciliación de capital exacta bajo el Sistema Francés. Saldo insoluto al cierre liquidado matemáticamente a $0.00.")
         else:
-            st.error("Discrepancia contable detectada en el redondeo.")
+            dictamen("peligro", "Discrepancia Contable", "Se ha detectado una diferencia en el redondeo de centavos del capital. Revise las tasas aplicadas.")
             
         st.session_state["credito_calculado"] = {
             "id_cliente": id_cliente,
@@ -170,7 +167,7 @@ with col_resumen:
 
 st.divider()
 
-st.subheader("Calendario Detallado de Obligaciones (Anexo al Contrato)")
+titulo_seccion("documento", "3. Calendario Detallado de Obligaciones (Anexo al Contrato)")
 
 if "credito_calculado" in st.session_state and st.session_state["credito_calculado"]:
     df_mostrar = st.session_state["credito_calculado"]["tabla_df"]
@@ -198,13 +195,12 @@ if "credito_calculado" in st.session_state and st.session_state["credito_calcula
                     "cuota_fija_proyectada": datos_c["cuota_fija_proyectada"],
                     "monto_total_recaudar": datos_c["monto_total_recaudar"],
                     "fecha_desembolso": datos_c["fecha_desembolso"],
-                    "estatus_credito": "VIGENTE"
+                    "estatus_credito": datos_c["estatus_credito"]
                 }
                 try:
                     id_prestamo_gen = formalizar_credito_y_amortización(payload_prestamo, datos_c["tabla_df"])
-                    st.success(f"Contrato formalizado exitosamente en el servidor. ID Institucional del Préstamo: {id_prestamo_gen}")
-                    st.info("El calendario completo de pagos ha quedado registrado en la base de datos. Puede proceder al Módulo Legal o de Cobranza.")
+                    dictamen("exito", "Contrato Formalizado Exitosamente en Supabase", f"ID Institucional del Préstamo: {id_prestamo_gen}. El calendario completo de pagos ha quedado registrado en la base de datos. Puede proceder al Módulo Legal o de Cobranza.")
                 except Exception as e:
-                    st.error(f"Fallo en la transacción de formalización: {str(e)}")
+                    dictamen("peligro", "Fallo en Transacción", f"No se pudo completar la formalización contractual en el servidor: {str(e)}")
 else:
     st.info("Configure los parámetros y presione el botón de cálculo para visualizar el calendario formal.")

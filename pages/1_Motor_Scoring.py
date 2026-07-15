@@ -1,31 +1,27 @@
 import streamlit as st
 import pandas as pd
 from src.db import supabase, registrar_cliente
+from src.theme import (
+    aplicar_identidad_visual, encabezado_modulo, titulo_seccion,
+    dictamen, tarjeta_kpi
+)
 
 st.set_page_config(page_title="Motor de Scoring | SOFOM", layout="wide")
 
-# Estilos institucionales para evitar desbordamientos en tarjetas de métricas
-st.markdown("""
-    <style>
-    div[data-testid="metric-container"] {
-        background-color: #F8F9FA;
-        border: 1px solid #E9ECEF;
-        padding: 5% 5% 5% 10%;
-        border-radius: 5px;
-        border-left: 4px solid #1A365D;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# 1. Inyectar identidad visual y encabezado modular
+aplicar_identidad_visual()
 
-st.title("Motor Cuantitativo de Admisión y Scoring")
-st.markdown("Evaluación algorítmica de riesgo y registro formal de solicitantes en base de datos.")
-st.divider()
+encabezado_modulo(
+    titulo="Motor Cuantitativo de Admisión y Scoring",
+    subtitulo="Evaluación algorítmica de riesgo de liquidez y registro transaccional de solicitantes en base de datos.",
+    nombre_icono="balanza",
+    insignia="SCORING ALGORÍTMICO"
+)
 
-# Ajustamos la proporción a [1, 1.4] para dar más espacio horizontal a los resultados
 col_form, col_res = st.columns([1, 1.4])
 
 with col_form:
-    st.subheader("1. Expediente del Solicitante")
+    titulo_seccion("personas", "1. Expediente del Solicitante")
     with st.form("form_admision", clear_on_submit=False):
         nombre = st.text_input("Nombre Completo del Deudor:", placeholder="Ej. Juan Pérez López")
         rfc = st.text_input("RFC con Homoclave (13 dígitos):", max_chars=13, placeholder="PELJ800101XYZ").upper()
@@ -46,13 +42,13 @@ with col_form:
         evaluar = st.form_submit_button("Ejecutar Evaluación Algorítmica", use_container_width=True)
 
 with col_res:
-    st.subheader("2. Dictamen del Motor y Registro")
+    titulo_seccion("escudo", "2. Dictamen del Motor y Registro")
     
     if evaluar:
         if not nombre or len(rfc) < 12:
-            st.warning("Por favor ingrese un Nombre válido y un RFC de al menos 12 caracteres para evaluar.")
+            dictamen("alerta", "Datos Incompletos", "Por favor ingrese un Nombre válido y un RFC de al menos 12 caracteres para proceder con la evaluación.")
         elif ingreso <= 0:
-            st.warning("El ingreso neto comprobado debe ser mayor a $0.00.")
+            dictamen("alerta", "Ingreso Inválido", "El ingreso neto comprobado debe ser mayor a $0.00 para calcular la capacidad de pago.")
         else:
             flujo_libre = ingreso - gastos - deudas
             capacidad_pago_quincenal = (flujo_libre * 0.30) / 2.0
@@ -61,32 +57,32 @@ with col_res:
             cuota_proyectada = monto * (tasa_quincenal * (1 + tasa_quincenal)**plazo_quincenas) / ((1 + tasa_quincenal)**plazo_quincenas - 1)
             ratio_compromiso = cuota_proyectada / (flujo_libre / 2.0) if flujo_libre > 0 else 1.0
             
-            # Cuadrícula 2x2 para evitar recortes de texto y números
+            # Cuadrícula 2x2 sin cortes de texto
             c1, c2 = st.columns(2)
             with c1:
-                st.metric("Flujo Libre Real (Mes)", f"${flujo_libre:,.2f}")
+                tarjeta_kpi("billetera", "Flujo Libre Real (Mes)", f"${flujo_libre:,.2f}", "Ingreso neto menos gastos y buró", "marino_800")
             with c2:
-                st.metric("Capacidad Máxima (Quincena)", f"${capacidad_pago_quincenal:,.2f}")
+                tarjeta_kpi("balanza", "Capacidad Máxima (Quincena)", f"${capacidad_pago_quincenal:,.2f}", "Límite del 30% institucional", "azul_600")
                 
             st.markdown("<br>", unsafe_allow_html=True)
             
             c3, c4 = st.columns(2)
             with c3:
-                st.metric("Cuota Proyectada (Quincena)", f"${cuota_proyectada:,.2f}")
+                tarjeta_kpi("calendario", "Cuota Proyectada (Quincena)", f"${cuota_proyectada:,.2f}", f"Pago amortizado a {plazo_quincenas} quincenas", "dorado_600")
             with c4:
-                st.metric("Ratio de Compromiso Real", f"{ratio_compromiso*100:.1f}%")
+                tarjeta_kpi("porcentaje", "Ratio de Compromiso Real", f"{ratio_compromiso*100:.1f}%", "Endeudamiento sobre flujo libre", "verde_lago")
             
             st.markdown("---")
             
             if flujo_libre <= 0 or ratio_compromiso > 0.40 or puntaje < 600:
                 estatus_code = "RECHAZADO"
-                st.error(f"DICTAMEN: RECHAZADO — ALTO RIESGO\n\nCompromiso de cuota ({ratio_compromiso*100:.1f}%) excede el límite permisible o puntaje de buró ({puntaje}) insuficiente.")
+                dictamen("peligro", "DICTAMEN: RECHAZADO — ALTO RIESGO", f"El compromiso de cuota ({ratio_compromiso*100:.1f}%) excede el límite permisible del 40% o el puntaje en buró ({puntaje}) es insuficiente.")
             elif ratio_compromiso <= 0.30 and puntaje >= 650:
                 estatus_code = "APROBADO"
-                st.success(f"DICTAMEN: APROBADO — RIESGO BAJO\n\nEl crédito compromete el {ratio_compromiso*100:.1f}% del flujo libre quincenal. Viable para pasar a formalización.")
+                dictamen("exito", "DICTAMEN: APROBADO — RIESGO BAJO", f"El crédito compromete el {ratio_compromiso*100:.1f}% del flujo libre quincenal, cumpliendo óptimamente la Regla del 30%. Viable para pase a formalización.")
             else:
                 estatus_code = "CONDICIONADO"
-                st.warning(f"DICTAMEN: CONDICIONADO — RIESGO MEDIO\n\nCompromiso del {ratio_compromiso*100:.1f}%. Se requiere obligatoriamente firma de aval solidario o garantía prendaria.")
+                dictamen("alerta", "DICTAMEN: CONDICIONADO — RIESGO MEDIO", f"Compromiso del {ratio_compromiso*100:.1f}%. Al situarse entre 30% y 40%, se requiere obligatoriamente firma de aval solidario o garantía prendaria.")
             
             st.divider()
             
@@ -113,14 +109,13 @@ with col_res:
                             "cuota": cuota_proyectada
                         }
                         
-                        st.success(f"Expediente Creado Exitosamente en Supabase\n\nUUID Institucional: {id_generado}")
-                        st.info("Pase al módulo 2 Amortizacion en el menú lateral para formalizar el contrato y generar el pagaré.")
+                        dictamen("exito", "Expediente Registrado en Supabase", f"UUID Institucional: {id_generado}. El expediente se encuentra disponible en el módulo de Amortización para emisión contractual.")
                     except Exception as e:
-                        st.error(f"Error al registrar en base de datos: {str(e)}")
+                        dictamen("peligro", "Error de Transacción", f"No se pudo completar el registro en base de datos: {str(e)}")
 
 st.divider()
 
-st.subheader("Catálogo Institucional de Clientes Registrados en Servidor")
+titulo_seccion("documento", "Catálogo Institucional de Clientes Registrados en Servidor")
 try:
     res_clientes = supabase.table("clientes").select("id_cliente, nombre_completo, rfc, ingreso_neto_mensual, puntaje_buro, estatus_admision, fecha_registro").order("fecha_registro", desc=True).limit(10).execute()
     if res_clientes.data:
@@ -128,6 +123,6 @@ try:
         df_db.columns = ["UUID", "Nombre", "RFC", "Ingreso Neto ($)", "Puntaje Buró", "Estatus", "Fecha Registro"]
         st.dataframe(df_db, use_container_width=True)
     else:
-        st.info("No hay registros en la base de datos de Supabase aún. Realice la primera evaluación arriba.")
+        st.info("No hay registros en la base de datos de Supabase aún. Realice la primera evaluación en el formulario superior.")
 except Exception as e:
-    st.error("No se pudo obtener el catálogo de clientes del servidor.")
+    dictamen("peligro", "Error de Consulta", "No se pudo obtener el catálogo de clientes desde el servidor.")
