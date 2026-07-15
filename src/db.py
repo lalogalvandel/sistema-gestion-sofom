@@ -5,15 +5,21 @@ import pandas as pd
 @st.cache_resource
 def obtener_cliente_supabase() -> Client:
     """
-    Se conecta a Supabase leyendo las variables de seguridad de Streamlit Cloud.
-    No requiere ningún archivo local .toml si se ejecuta en la nube.
+    Intenta leer las credenciales en el nivel principal o dentro de la sección [supabase].
     """
     try:
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_KEY"]
+        # 1. Intentar buscar dentro de la sección [supabase] si existe
+        if "supabase" in st.secrets:
+            url = st.secrets["supabase"]["SUPABASE_URL"]
+            key = st.secrets["supabase"]["SUPABASE_KEY"]
+        # 2. Si no, buscar en el nivel principal
+        else:
+            url = st.secrets["SUPABASE_URL"]
+            key = st.secrets["SUPABASE_KEY"]
+            
         return create_client(url, key)
     except Exception as e:
-        st.error("🚨 Error de conexión: No se encontraron las credenciales en los Secrets de Streamlit.")
+        st.error("🚨 Error de conexión: No se pudieron leer las credenciales en st.secrets. Verifique que los nombres SUPABASE_URL y SUPABASE_KEY coincidan en Streamlit Cloud.")
         st.stop()
 
 # Cliente global para importar en cualquier página
