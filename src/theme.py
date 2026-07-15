@@ -1,31 +1,31 @@
 import streamlit as st
 
 # =============================================================================
-# 1. PALETA DE COLORES INSTITUCIONAL
+# 1. PALETA DE COLORES (EJECUTIVA DE ALTO CONTRASTE)
 # =============================================================================
 PALETA = {
-    "marino_900": "#0F2942",
-    "marino_800": "#1A365D",
-    "marino_700": "#2C4A73",
-    "azul_600":   "#2B6CB0",
-    "azul_100":   "#EBF4FB",
-    "verde_lago": "#3E8E7E",
-    "turquesa":   "#81E6D9",
-    "dorado_600": "#A9812F",
-    "dorado_100": "#F6EFDE",
-    "exito":      "#2F7A52",
-    "exito_bg":   "#EAF6EF",
-    "alerta":     "#B7791F",
-    "alerta_bg":  "#FDF3E0",
-    "peligro":    "#B42318",
-    "peligro_bg": "#FDECEA",
-    "tinta_900":  "#1A202C",
-    "tinta_600":  "#4A5568",
-    "tinta_400":  "#718096",
-    "linea_200":  "#E2E8F0",
-    "linea_100":  "#EDF1F5",
-    "superficie": "#FFFFFF",
-    "lienzo":     "#F7F9FB",
+    "marino_900": "#0F172A",  # Pizarra oscuro para textos principales (máxima legibilidad)
+    "marino_800": "#1E293B",  # Azul institucional para bordes y acentos
+    "marino_700": "#334155",  # Tono secundario
+    "azul_600":   "#2563EB",  # Azul rey brillante para métricas activas
+    "azul_100":   "#EFF6FF",  # Fondo suave
+    "verde_lago": "#0D9488",  # Tono financiero estable
+    "turquesa":   "#14B8A6",  # Acento secundario
+    "dorado_600": "#D97706",  # Ámbar/Dorado para comisiones y retornos
+    "dorado_100": "#FEF3C7",  # Fondo de alerta/dorado
+    "exito":      "#16A34A",  # Verde confirmación
+    "exito_bg":   "#DCFCE7",  # Fondo verde suave
+    "alerta":     "#D97706",  # Ámbar advertencia
+    "alerta_bg":  "#FEF3C7",  # Fondo ámbar suave
+    "peligro":    "#DC2626",  # Rojo rechazo
+    "peligro_bg": "#FEE2E2",  # Fondo rojo suave
+    "tinta_900":  "#0F172A",  # Texto primario
+    "tinta_600":  "#475569",  # Texto descriptivo (alta legibilidad)
+    "tinta_400":  "#64748B",  # Texto secundario / etiquetas
+    "linea_200":  "#CBD5E1",  # Bordes definidos
+    "linea_100":  "#E2E8F0",  # Bordes ligeros
+    "superficie": "#FFFFFF",  # Blanco puro para tarjetas
+    "lienzo":     "#F8FAFC",  # Fondo global blanco/gris ejecutivo
 }
 
 FUENTE_TITULOS = "'Source Serif 4', Georgia, 'Times New Roman', serif"
@@ -38,18 +38,19 @@ SECUENCIA_GRAFICAS = [
 ]
 
 def plantilla_plotly(fig, altura=300, leyenda=False):
+    """Aplica tipografía, color y márgenes consistentes a cualquier figura Plotly."""
     fig.update_layout(
         height=altura,
-        margin=dict(t=28, b=10, l=6, r=6),
+        margin=dict(t=30, b=10, l=10, r=10),
         showlegend=leyenda,
-        font=dict(family="Inter, sans-serif", size=12.5, color=PALETA["tinta_600"]),
+        font=dict(family="Inter, sans-serif", size=13, color=PALETA["tinta_600"]),
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
         hoverlabel=dict(bgcolor=PALETA["marino_900"], font_color="white", font_family="Inter, sans-serif"),
         legend=dict(orientation="h", yanchor="bottom", y=-0.28, xanchor="center", x=0.5),
     )
-    fig.update_xaxes(gridcolor=PALETA["linea_100"], zeroline=False)
-    fig.update_yaxes(gridcolor=PALETA["linea_100"], zeroline=False)
+    fig.update_xaxes(gridcolor=PALETA["linea_100"], zeroline=False, tickfont=dict(color=PALETA["tinta_600"]))
+    fig.update_yaxes(gridcolor=PALETA["linea_100"], zeroline=False, tickfont=dict(color=PALETA["tinta_600"]))
     return fig
 
 # =============================================================================
@@ -80,118 +81,158 @@ def icono(nombre, color=None, size=18):
     return (
         f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" '
         f'stroke="{color}" color="{color}" stroke-width="1.7" stroke-linecap="round" '
-        f'stroke-linejoin="round" style="vertical-align:-3px;margin-right:7px;flex-shrink:0">'
+        f'stroke-linejoin="round" style="vertical-align:-3px;margin-right:8px;flex-shrink:0">'
         f'{contenido}</svg>'
     )
 
 # =============================================================================
-# 3. HOJA DE ESTILOS CSS
+# 3. HOJA DE ESTILOS CSS BLINDADA CONTRA MODO OSCURO
 # =============================================================================
 def aplicar_identidad_visual():
     st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
-    html, body, [class*="css"] {{ font-family: {FUENTE_BASE}; }}
-    .block-container {{ padding-top: 2.2rem; }}
+    /* Forzar fondo ejecutivo y color de texto global en toda la aplicación */
+    .stApp {{
+        background-color: {PALETA['lienzo']} !important;
+        color: {PALETA['tinta_900']} !important;
+    }}
+    
+    html, body, [class*="css"], p, span, div {{
+        font-family: {FUENTE_BASE};
+        color: {PALETA['tinta_900']};
+    }}
+    
+    /* Mayor margen superior para evitar que se corten palabras en títulos */
+    .block-container {{
+        padding-top: 3.5rem !important;
+        padding-bottom: 4rem !important;
+        max-width: 95% !important;
+    }}
 
+    /* ---------- Barra superior de módulo ---------- */
     .sofom-topbar {{
         display: flex; align-items: center; justify-content: space-between;
-        flex-wrap: wrap; gap: 10px;
-        padding-bottom: 16px; margin-bottom: 4px;
-        border-bottom: 1px solid {PALETA['linea_200']};
+        flex-wrap: wrap; gap: 12px;
+        padding-bottom: 18px; margin-bottom: 12px;
+        border-bottom: 2px solid {PALETA['linea_200']};
     }}
     .sofom-titulo {{
-        font-family: {FUENTE_TITULOS}; font-size: 26px; font-weight: 600;
-        color: {PALETA['marino_900']}; margin: 0; letter-spacing: -0.2px;
+        font-family: {FUENTE_TITULOS}; font-size: 28px; font-weight: 700;
+        color: {PALETA['marino_900']} !important; margin: 0 !important;
+        letter-spacing: -0.3px; line-height: 1.25 !important;
     }}
     .sofom-subtitulo {{
-        font-family: {FUENTE_BASE}; font-size: 13.5px; color: {PALETA['tinta_400']};
-        margin-top: 4px;
+        font-family: {FUENTE_BASE}; font-size: 14px; font-weight: 500;
+        color: {PALETA['tinta_600']} !important; margin-top: 4px !important;
+        line-height: 1.4 !important;
     }}
     .sofom-insignia {{
-        display: inline-flex; align-items: center; gap: 7px;
-        font-size: 11px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase;
-        color: {PALETA['exito']}; background: {PALETA['exito_bg']};
-        border: 1px solid {PALETA['exito']}40; border-radius: 20px;
-        padding: 6px 13px; white-space: nowrap;
+        display: inline-flex; align-items: center; gap: 8px;
+        font-size: 11.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+        color: {PALETA['exito']} !important; background: {PALETA['exito_bg']} !important;
+        border: 1px solid {PALETA['exito']}60; border-radius: 20px;
+        padding: 6px 14px; white-space: nowrap;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }}
     .sofom-insignia .punto {{
-        width: 6px; height: 6px; border-radius: 50%; background: {PALETA['exito']};
-        box-shadow: 0 0 0 3px {PALETA['exito']}25;
+        width: 7px; height: 7px; border-radius: 50%; background: {PALETA['exito']};
+        box-shadow: 0 0 0 3px {PALETA['exito']}30;
     }}
 
+    /* ---------- Tarjetas KPI ---------- */
     .sofom-kpi {{
-        background: {PALETA['superficie']};
-        border: 1px solid {PALETA['linea_200']};
-        border-left: 3px solid var(--acento, {PALETA['marino_800']});
-        border-radius: 10px; padding: 15px 17px; height: 100%;
-        box-shadow: 0 1px 2px rgba(15,41,66,0.05);
+        background: {PALETA['superficie']} !important;
+        border: 1px solid {PALETA['linea_200']} !important;
+        border-left: 4px solid var(--acento, {PALETA['marino_800']}) !important;
+        border-radius: 8px; padding: 18px 20px; height: 100%;
+        box-shadow: 0 2px 4px rgba(15,23,42,0.04);
     }}
     .sofom-kpi-etiqueta {{
-        display: flex; align-items: center; font-size: 11.8px; font-weight: 600;
-        color: {PALETA['tinta_600']}; text-transform: uppercase; letter-spacing: 0.3px;
-        margin-bottom: 11px;
+        display: flex; align-items: center; font-size: 12px; font-weight: 700;
+        color: {PALETA['tinta_600']} !important; text-transform: uppercase; letter-spacing: 0.5px;
+        margin-bottom: 12px;
     }}
     .sofom-kpi-valor {{
-        font-family: {FUENTE_DATOS}; font-size: 24px; font-weight: 500;
-        color: {PALETA['marino_900']}; line-height: 1.15;
+        font-family: {FUENTE_DATOS}; font-size: 26px; font-weight: 600;
+        color: {PALETA['marino_900']} !important; line-height: 1.2;
     }}
-    .sofom-kpi-contexto {{ font-size: 11.8px; color: {PALETA['tinta_400']}; margin-top: 7px; }}
+    .sofom-kpi-contexto {{
+        font-size: 12.5px; font-weight: 500; color: {PALETA['tinta_400']} !important;
+        margin-top: 8px;
+    }}
 
+    /* ---------- Tarjeta de contenido genérica ---------- */
     .sofom-tarjeta {{
-        background: {PALETA['superficie']}; border: 1px solid {PALETA['linea_200']};
-        border-radius: 10px; padding: 19px 21px; height: 100%;
+        background: {PALETA['superficie']} !important; border: 1px solid {PALETA['linea_200']} !important;
+        border-radius: 8px; padding: 22px 24px; height: 100%;
+        box-shadow: 0 2px 4px rgba(15,23,42,0.04);
     }}
     .sofom-tarjeta h4 {{
-        font-family: {FUENTE_BASE}; font-size: 14px; font-weight: 700;
-        color: {PALETA['marino_900']}; margin: 0 0 2px 0;
+        font-family: {FUENTE_BASE}; font-size: 15px; font-weight: 700;
+        color: {PALETA['marino_900']} !important; margin: 0 0 6px 0 !important;
         display: flex; align-items: center;
     }}
     .sofom-tarjeta-item {{
-        display: flex; gap: 11px; padding: 11px 0;
+        display: flex; gap: 12px; padding: 12px 0;
         border-top: 1px solid {PALETA['linea_100']};
-        font-size: 13px; color: {PALETA['tinta_600']}; line-height: 1.55;
+        font-size: 13.5px; color: {PALETA['tinta_600']} !important; line-height: 1.6;
     }}
     .sofom-tarjeta-item:first-of-type {{ border-top: none; }}
-    .sofom-tarjeta-item b {{ color: {PALETA['tinta_900']}; }}
+    .sofom-tarjeta-item b {{ color: {PALETA['tinta_900']} !important; font-weight: 600; }}
     .sofom-num {{
-        flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%;
-        background: {PALETA['marino_800']}; color: white; font-size: 10.5px; font-weight: 700;
-        display: flex; align-items: center; justify-content: center; margin-top: 1px;
+        flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+        background: {PALETA['marino_800']}; color: white !important; font-size: 11px; font-weight: 700;
+        display: flex; align-items: center; justify-content: center; margin-top: 2px;
     }}
 
+    /* ---------- Encabezado de sección ---------- */
     .sofom-seccion {{
         display: flex; align-items: center; font-family: {FUENTE_BASE};
-        font-size: 15px; font-weight: 700; color: {PALETA['marino_900']};
-        margin: 2px 0 13px 0;
+        font-size: 16px; font-weight: 700; color: {PALETA['marino_900']} !important;
+        margin: 16px 0 14px 0; letter-spacing: -0.2px;
     }}
 
+    /* ---------- Dictamen (insignia de resultado) ---------- */
     .sofom-dictamen {{
-        border-radius: 10px; padding: 15px 17px;
-        display: flex; gap: 12px; align-items: flex-start; border: 1px solid;
+        border-radius: 8px; padding: 16px 18px;
+        display: flex; gap: 14px; align-items: flex-start; border: 1px solid;
+        margin: 12px 0;
     }}
-    .sofom-dictamen-titulo {{ font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }}
-    .sofom-dictamen-texto {{ font-size: 13.3px; line-height: 1.55; color: {PALETA['tinta_600']}; }}
-    .sofom-dictamen.exito {{ background: {PALETA['exito_bg']}; border-color: {PALETA['exito']}45; }}
-    .sofom-dictamen.exito .sofom-dictamen-titulo {{ color: {PALETA['exito']}; }}
-    .sofom-dictamen.alerta {{ background: {PALETA['alerta_bg']}; border-color: {PALETA['alerta']}45; }}
-    .sofom-dictamen.alerta .sofom-dictamen-titulo {{ color: {PALETA['alerta']}; }}
-    .sofom-dictamen.peligro {{ background: {PALETA['peligro_bg']}; border-color: {PALETA['peligro']}45; }}
-    .sofom-dictamen.peligro .sofom-dictamen-titulo {{ color: {PALETA['peligro']}; }}
+    .sofom-dictamen-titulo {{ font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }}
+    .sofom-dictamen-texto {{ font-size: 13.5px; line-height: 1.6; color: {PALETA['tinta_600']} !important; }}
+    .sofom-dictamen.exito {{ background: {PALETA['exito_bg']} !important; border-color: {PALETA['exito']}60 !important; }}
+    .sofom-dictamen.exito .sofom-dictamen-titulo {{ color: {PALETA['exito']} !important; }}
+    .sofom-dictamen.alerta {{ background: {PALETA['alerta_bg']} !important; border-color: {PALETA['alerta']}60 !important; }}
+    .sofom-dictamen.alerta .sofom-dictamen-titulo {{ color: {PALETA['alerta']} !important; }}
+    .sofom-dictamen.peligro {{ background: {PALETA['peligro_bg']} !important; border-color: {PALETA['peligro']}60 !important; }}
+    .sofom-dictamen.peligro .sofom-dictamen-titulo {{ color: {PALETA['peligro']} !important; }}
 
+    /* ---------- Ajustes a widgets nativos de Streamlit ---------- */
     div[data-testid="metric-container"] {{
-        background: {PALETA['superficie']}; border: 1px solid {PALETA['linea_200']};
-        border-radius: 10px; padding: 5% 5% 5% 8%; border-left: 4px solid {PALETA['marino_800']};
+        background: {PALETA['superficie']} !important; border: 1px solid {PALETA['linea_200']} !important;
+        border-radius: 8px; padding: 16px 18px !important; border-left: 4px solid {PALETA['marino_800']} !important;
+        box-shadow: 0 2px 4px rgba(15,23,42,0.04);
+    }}
+    div[data-testid="stMetricLabel"] > label, div[data-testid="stMetricLabel"] > div {{
+        color: {PALETA['tinta_600']} !important; font-weight: 600 !important;
+    }}
+    div[data-testid="stMetricValue"] > div {{
+        color: {PALETA['marino_900']} !important; font-family: {FUENTE_DATOS} !important;
     }}
     .stButton > button, .stFormSubmitButton > button {{
-        background: {PALETA['marino_800']}; color: white; border: none;
-        border-radius: 7px; font-weight: 600; letter-spacing: 0.2px; padding: 10px 0;
-        transition: background 0.15s ease;
+        background: {PALETA['marino_800']} !important; color: white !important; border: none !important;
+        border-radius: 6px; font-weight: 600; letter-spacing: 0.3px; padding: 10px 16px;
+        transition: all 0.15s ease;
     }}
-    .stButton > button:hover, .stFormSubmitButton > button:hover {{ background: {PALETA['marino_900']}; color: white; }}
-    .stButton > button[kind="primary"] {{ background: {PALETA['dorado_600']}; }}
-    .stButton > button[kind="primary"]:hover {{ background: #8C6A26; }}
+    .stButton > button:hover, .stFormSubmitButton > button:hover {{
+        background: {PALETA['marino_900']} !important; color: white !important;
+        box-shadow: 0 4px 6px rgba(15,23,42,0.15);
+    }}
+    .stButton > button[kind="primary"] {{ background: {PALETA['dorado_600']} !important; }}
+    .stButton > button[kind="primary"]:hover {{ background: #B45309 !important; }}
+    
     #MainMenu {{ visibility: hidden; }}
     footer {{ visibility: hidden; }}
     </style>
@@ -201,11 +242,11 @@ def aplicar_identidad_visual():
 # 4. COMPONENTES REUTILIZABLES
 # =============================================================================
 def encabezado_modulo(titulo, subtitulo, nombre_icono=None, insignia=None):
-    icono_html = icono(nombre_icono, color=PALETA["marino_800"], size=27) if nombre_icono else ""
+    icono_html = icono(nombre_icono, color=PALETA["marino_800"], size=30) if nombre_icono else ""
     insignia_html = f'<span class="sofom-insignia"><span class="punto"></span>{insignia}</span>' if insignia else ""
     st.markdown(f"""
     <div class="sofom-topbar">
-        <div style="display:flex; align-items:center; gap:13px;">
+        <div style="display:flex; align-items:center; gap:14px;">
             {icono_html}
             <div>
                 <p class="sofom-titulo">{titulo}</p>
@@ -220,17 +261,17 @@ def tarjeta_kpi(nombre_icono, etiqueta, valor, contexto="", acento="marino_800")
     color_acento = PALETA.get(acento, PALETA["marino_800"])
     st.markdown(f"""
     <div class="sofom-kpi" style="--acento:{color_acento}">
-        <div class="sofom-kpi-etiqueta">{icono(nombre_icono, color=PALETA['tinta_400'], size=14)}{etiqueta}</div>
+        <div class="sofom-kpi-etiqueta">{icono(nombre_icono, color=PALETA['tinta_400'], size=15)}{etiqueta}</div>
         <div class="sofom-kpi-valor">{valor}</div>
         <div class="sofom-kpi-contexto">{contexto}</div>
     </div>
     """, unsafe_allow_html=True)
 
 def titulo_seccion(nombre_icono, texto):
-    st.markdown(f'<div class="sofom-seccion">{icono(nombre_icono, size=18)}{texto}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="sofom-seccion">{icono(nombre_icono, size=20)}{texto}</div>', unsafe_allow_html=True)
 
 def tarjeta_protocolo(titulo, items, nombre_icono=None):
-    icono_html = icono(nombre_icono, color=PALETA["marino_800"], size=16) if nombre_icono else ""
+    icono_html = icono(nombre_icono, color=PALETA["marino_800"], size=18) if nombre_icono else ""
     filas = "".join(
         f'<div class="sofom-tarjeta-item"><span class="sofom-num">{i + 1}</span>'
         f'<span><b>{h}.</b> {t}</span></div>'
@@ -243,7 +284,7 @@ def dictamen(estatus, titulo_txt, texto_txt):
     color_map = {"exito": PALETA["exito"], "alerta": PALETA["alerta"], "peligro": PALETA["peligro"]}
     st.markdown(f"""
     <div class="sofom-dictamen {estatus}">
-        {icono(icon_map[estatus], color=color_map[estatus], size=22)}
+        {icono(icon_map[estatus], color=color_map[estatus], size=24)}
         <div>
             <div class="sofom-dictamen-titulo">{titulo_txt}</div>
             <div class="sofom-dictamen-texto">{texto_txt}</div>
