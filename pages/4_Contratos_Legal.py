@@ -7,7 +7,7 @@ from src.db import supabase
 
 st.set_page_config(page_title="Emisión Legal | SOFOM", layout="wide")
 
-# Estilos corporativos limpios y formales
+# Estilos corporativos para formatear tarjetas de métricas sin desbordamiento
 st.markdown("""
     <style>
     div[data-testid="metric-container"] {
@@ -30,7 +30,7 @@ st.divider()
 class PagarePDF(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 14)
-        self.set_text_color(26, 54, 93) # Azul marino institucional
+        self.set_text_color(26, 54, 93)
         self.cell(0, 10, 'PAGARÉ INCONDICIONAL DE PAGO', 0, 1, 'C')
         self.set_font('Arial', 'I', 9)
         self.set_text_color(100, 100, 100)
@@ -48,7 +48,6 @@ def generar_pdf_pagare(datos_prestamo, datos_cliente, cuotas_df, lugar_expedicio
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=20)
     
-    # Textos limpios para codificación estándar
     def clean_text(text):
         return str(text).encode('latin-1', 'replace').decode('latin-1')
     
@@ -129,7 +128,6 @@ def generar_pdf_pagare(datos_prestamo, datos_cliente, cuotas_df, lugar_expedicio
     pdf.cell(0, 6, clean_text(f"Expediente: {datos_prestamo['id_prestamo']} | Deudor: {datos_cliente['nombre_completo']}"), 0, 1, 'L')
     pdf.ln(5)
     
-    # Encabezados de tabla PDF
     pdf.set_font('Arial', 'B', 8)
     pdf.set_fill_color(26, 54, 93)
     pdf.set_text_color(255, 255, 255)
@@ -141,7 +139,6 @@ def generar_pdf_pagare(datos_prestamo, datos_cliente, cuotas_df, lugar_expedicio
         pdf.cell(anchos[i], 7, clean_text(col), 1, 0, 'C', True)
     pdf.ln()
     
-    # Filas de tabla PDF
     pdf.set_font('Arial', '', 8)
     pdf.set_text_color(0, 0, 0)
     pdf.set_fill_color(247, 250, 252)
@@ -205,25 +202,33 @@ with col_config:
             
             st.markdown("---")
             st.markdown("#### Resumen de Obligación por Contratar")
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Principal", f"${datos_contrato['monto_principal']:,.2f}")
-            m2.metric("Total a Pagar", f"${datos_contrato['monto_total_recaudar']:,.2f}")
-            m3.metric("Plazo", f"{datos_contrato['plazo_quincenas']} quincenas")
-            m4.metric("Tasa Moratoria", f"{float(datos_contrato['tasa_interes_mensual'])*200:.1f}% mensual")
+            
+            # Cuadrícula simétrica 2x2 para eliminar el amontonamiento de texto y cifras
+            m1, m2 = st.columns(2)
+            with m1:
+                st.metric("Principal Otorgado", f"${datos_contrato['monto_principal']:,.2f}")
+            with m2:
+                st.metric("Total a Pagar", f"${datos_contrato['monto_total_recaudar']:,.2f}")
+                
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            m3, m4 = st.columns(2)
+            with m3:
+                st.metric("Plazo Pactado", f"{datos_contrato['plazo_quincenas']} quincenas")
+            with m4:
+                st.metric("Tasa Moratoria", f"{float(datos_contrato['tasa_interes_mensual'])*200:.1f}% mensual")
             
             generar_doc = st.form_submit_button("Generar Pagaré Ejecutivo y Anexo (PDF)", use_container_width=True)
             
             if generar_doc:
                 with st.spinner("Compilando instrumento legal y tabla de amortización desde servidor..."):
                     try:
-                        # Consultar el calendario inmutable asociado a este crédito en Supabase
                         res_tabla = supabase.table("plan_amortizacion").select("*").eq("id_prestamo", id_p).order("numero_cuota", desc=False).execute()
                         if not res_tabla.data or len(res_tabla.data) == 0:
                             st.error("No se encontró la tabla de amortización para este préstamo en el servidor.")
                         else:
                             df_cuotas_legal = pd.DataFrame(res_tabla.data)
                             
-                            # Generar archivo PDF en memoria de bytes
                             pdf_bytes = generar_pdf_pagare(
                                 datos_prestamo=datos_contrato,
                                 datos_cliente=datos_cli,
