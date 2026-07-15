@@ -2,6 +2,28 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
+# Estructura de memoria institucional en app.py
+def inicializar_memoria_operativa():
+    if "expediente_activo" not in st.session_state:
+        st.session_state.expediente_activo = {
+            "id_cliente": None,
+            "nombre_completo": None,
+            "rfc": None,
+            "ingreso_neto": 0.00,
+            "capacidad_pago_quincenal": 0.00,
+            "estatus_evaluacion": None
+        }
+    if "credito_en_proceso" not in st.session_state:
+        st.session_state.credito_en_proceso = {
+            "id_prestamo": None,
+            "monto_aprobado": 0.00,
+            "tasa_mensual": 0.06,
+            "plazo_quincenas": 12,
+            "tabla_generada": None
+        }
+
+inicializar_memoria_operativa()
+
 # Configuración general de la página
 st.set_page_config(
     page_title="Sistema de Gestión SOFOM - Core Engine",
