@@ -9,7 +9,6 @@ from src.theme import (
 
 st.set_page_config(page_title="Control de Cobranza y Comisiones | SOFOM", layout="wide")
 
-# 1. Inyectar identidad visual y encabezado modular
 aplicar_identidad_visual()
 
 encabezado_modulo(
@@ -41,7 +40,6 @@ def obtener_resumen_cobranza():
 
 recibido_hist, interes_hist, comision_hist, utilidad_hist = obtener_resumen_cobranza()
 
-# Cuadrícula simétrica 2x2 para evitar recortes numéricos
 k1, k2 = st.columns(2)
 with k1:
     tarjeta_kpi("billetera", "Total Recaudado en Caja", f"${recibido_hist:,.2f}", "Flujo acumulado de capital e interés", "marino_800")
@@ -59,7 +57,7 @@ with k4:
 st.divider()
 
 # -----------------------------------------------------------------------------
-# SECCIÓN 2: REGISTRO TRANSACCIONAL DE PAGOS QUINCENALES
+# SECCIÓN 2: REGISTRO TRANSACCIONAL CON BLINDAJE DE CAJA (PRELACIÓN DE PAGO)
 # -----------------------------------------------------------------------------
 titulo_seccion("caja", "2. Ventanilla de Cobranza y Registro de Abonos")
 
@@ -106,49 +104,72 @@ with col_operacion:
             id_cuota = cuota_pend["id_cuota"]
             num_q = cuota_pend["numero_cuota"]
             fecha_venc = cuota_pend["fecha_vencimiento"]
-            monto_cuota = float(cuota_pend["cuota_fija"])
-            abono_cap = float(cuota_pend["abono_capital"])
-            interes_q = float(cuota_pend["interes_cobrado"])
-            
-            comision_calc = round(interes_q * 0.20, 2)
-            reserva_calc = round(interes_q * 0.15, 2)
-            utilidad_calc = round(interes_q * 0.65 + abono_cap, 2)
+            monto_cuota_teorico = float(cuota_pend["cuota_fija"])
+            abono_cap_teorico = float(cuota_pend["abono_capital"])
+            interes_q_teorico = float(cuota_pend["interes_cobrado"])
             
             with st.form("form_cobranza_transaccional"):
                 st.info(f"**Vencimiento Detectado:** Quincena N° **{num_q}** | Fecha límite: **{fecha_venc}**")
                 
                 c_a, c_b, c_c = st.columns(3)
-                c_a.text_input("Monto Cuota ($):", value=f"${monto_cuota:,.2f}", disabled=True)
-                c_b.text_input("Abono Capital ($):", value=f"${abono_cap:,.2f}", disabled=True)
-                c_c.text_input("Interés Quincena ($):", value=f"${interes_q:,.2f}", disabled=True)
+                c_a.text_input("Cuota Teórica ($):", value=f"${monto_cuota_teorico:,.2f}", disabled=True)
+                c_b.text_input("Abono Capital Teórico ($):", value=f"${abono_cap_teorico:,.2f}", disabled=True)
+                c_c.text_input("Interés Quincena ($):", value=f"${interes_q_teorico:,.2f}", disabled=True)
                 
                 st.markdown("---")
-                st.markdown("#### Desglose Automático de Retribución Operativa")
-                r1, r2, r3 = st.columns(3)
-                r1.metric("Comisión Operador (20%)", f"${comision_calc:,.2f}")
-                r2.metric("Reserva Riesgo (15%)", f"${reserva_calc:,.2f}")
-                r3.metric("Dividendo Socios (65%+Cap)", f"${utilidad_calc:,.2f}")
+                monto_recibido_real = st.number_input("Confirmar Monto Real Recibido en ventanilla ($):", min_value=1.0, value=monto_cuota_teorico, step=100.0)
                 
-                monto_recibido_real = st.number_input("Confirmar Monto Real Recibido en Caja ($):", min_value=1.0, value=monto_cuota, step=100.0)
+                # ---------------------------------------------------------------------
+# LÓGICA FINANCIERA DE PRELACIÓN DE PAGO (BLINDAJE DE CAJA)
+# ---------------------------------------------------------------------
+                if monto_recibido_real >= interes_q_teorico:
+                    interes_real = interes_q_teorico
+                    abono_cap_real = round(monto_recibido_real - interes_real, 2)
+                else:
+                    # Si paga menos que el interés, todo va a interés y cero a capital
+                    interes_real = monto_recibido_real
+                    abono_cap_real = 0.0
+                    
+                comision_calc = round(interes_real * 0.20, 2)
+                reserva_calc = round(interes_real * 0.15, 2)
+                utilidad_calc = round((interes_real * 0.65) + abono_cap_real, 2)
+                
+                st.markdown("#### Desglose Dinámico sobre Efectivo Recibido")
+                r1, r2, r3 = st.columns(3)
+                r1.metric("Tu Comisión (20%)", f"${comision_calc:,.2f}")
+                r2.metric("Reserva Riesgo (15%)", f"${reserva_calc:,.2f}")
+                r3.metric("Flujo Real Socios", f"${utilidad_calc:,.2f}", delta=f"Cap. cobrado: ${abono_cap_real:,.2f}")
+                
+                if monto_recibido_real < monto_cuota_teorico:
+                    st.warning(f"⚠️ **Aviso de Abono Irregular:** El cliente pagó **${monto_cuota_teorico - monto_recibido_real:,.2f}** menos que la cuota pactada. Se cubrió el interés y el capital se redujo a **${abono_cap_real:,.2f}** para no desbalancear el fondo.")
                 
                 procesar = st.form_submit_button("Registrar Pago y Ejecutar Reparto Contable", use_container_width=True)
                 
                 if procesar:
                     with st.spinner("Actualizando tablas transaccionales en servidor..."):
                         try:
-                            supabase.table("plan_amortizacion").update({"estatus_pago": "PAGADO"}).eq("id_cuota", id_cuota).execute()
+                            # 1. Actualizar estatus en plan_amortizacion
+                            # Si pagó el 100% de la cuota se marca PAGADO, si fue menos se marca PARCIAL
+                            estatus_asignar = "PAGADO" if monto_recibido_real >= monto_cuota_teorico else "PAGO PARCIAL"
                             
+                            supabase.table("plan_amortizacion").update({
+                                "estatus_pago": estatus_asignar,
+                                "abono_capital": abono_cap_real, # Guardamos el capital real que aportó
+                                "interes_cobrado": interes_real
+                            }).eq("id_cuota", id_cuota).execute()
+                            
+                            # 2. Insertar registro contable real en cobranza
                             payload_pago = {
                                 "id_cuota": id_cuota,
                                 "monto_recibido": monto_recibido_real,
-                                "interes_real_cobrado": interes_q,
+                                "interes_real_cobrado": interes_real,
                                 "comision_operador": comision_calc,
                                 "reserva_riesgo": reserva_calc,
                                 "utilidad_socios": utilidad_calc
                             }
                             supabase.table("cobranza_y_comisiones").insert(payload_pago).execute()
                             
-                            dictamen("exito", "Pago Registrado Exitosamente", f"Quincena N° {num_q} abonada en base de datos. Comisión operativa de ${comision_calc:,.2f} asignada.")
+                            dictamen("exito", f"Transacción Exitosa ({estatus_asignar})", f"Quincena N° {num_q} registrada con ingreso en caja de ${monto_recibido_real:,.2f}. El reparto a socios ha sido conciliado sin generar déficit.")
                             st.rerun()
                         except Exception as e:
                             dictamen("peligro", "Error de Transacción", f"Fallo al procesar la cobranza en el servidor: {str(e)}")
@@ -166,7 +187,7 @@ try:
     if res_bitacora.data and len(res_bitacora.data) > 0:
         df_bitacora = pd.DataFrame(res_bitacora.data)
         df_bitacora["fecha_pago_real"] = pd.to_datetime(df_bitacora["fecha_pago_real"]).dt.strftime("%Y-%m-%d %H:%M")
-        df_bitacora.columns = ["Fecha / Hora Pago", "Monto Recibido ($)", "Interés Cobrado ($)", "Tu Comisión 20% ($)", "Flujo Socios ($)"]
+        df_bitacora.columns = ["Fecha / Hora Pago", "Monto Recibido ($)", "Interés Cobrado ($)", "Tu Comisión 20% ($)", "Flujo Real Socios ($)"]
         st.dataframe(df_bitacora, use_container_width=True)
     else:
         st.info("No hay transacciones de pago registradas en la bitácora del servidor.")
