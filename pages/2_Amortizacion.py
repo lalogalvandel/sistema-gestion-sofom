@@ -6,11 +6,23 @@ from src.db import supabase, formalizar_credito_y_amortización
 
 st.set_page_config(page_title="Amortización y Formalización | SOFOM", layout="wide")
 
+# Estilos corporativos para evitar desbordamiento y amontonamiento en tarjetas numéricas
+st.markdown("""
+    <style>
+    div[data-testid="metric-container"] {
+        background-color: #F8F9FA;
+        border: 1px solid #E9ECEF;
+        padding: 5% 5% 5% 8%;
+        border-radius: 5px;
+        border-left: 4px solid #1A365D;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 st.title("Motor de Amortización y Formalización de Contratos")
 st.markdown("Generación de calendarios bajo el Sistema Francés y registro transaccional en PostgreSQL.")
 st.divider()
 
-# Consulta de deudores aprobados o condicionados desde Supabase
 def obtener_clientes_aprobados():
     try:
         res = supabase.table("clientes").select("id_cliente, nombre_completo, rfc, estatus_admision").in_("estatus_admision", ["APROBADO", "CONDICIONADO"]).order("fecha_registro", desc=True).execute()
@@ -20,7 +32,6 @@ def obtener_clientes_aprobados():
 
 clientes_db = obtener_clientes_aprobados()
 
-# Construir opciones del selector dinámico
 opciones_selector = ["-- Seleccione un Deudor Aprobado --"]
 mapa_clientes = {}
 for c in clientes_db:
@@ -28,12 +39,11 @@ for c in clientes_db:
     opciones_selector.append(etiqueta)
     mapa_clientes[etiqueta] = c
 
-col_param, col_resumen = st.columns([1, 1.5])
+col_param, col_resumen = st.columns([1, 1.4])
 
 with col_param:
     st.subheader("Parámetros del Crédito")
     
-    # Pre-seleccionar si el usuario viene redirigido del Módulo de Admisión
     index_defecto = 0
     if "expediente_activo" in st.session_state and st.session_state["expediente_activo"]:
         id_activo = st.session_state["expediente_activo"].get("id_cliente")
@@ -51,7 +61,6 @@ with col_param:
             nombre_mostrar = cliente_sel["nombre_completo"]
             rfc_mostrar = cliente_sel["rfc"]
             
-            # Recuperar parámetros previos si existen en sesión
             monto_init = 15000.0
             tasa_init = 6.0
             if "expediente_activo" in st.session_state and st.session_state["expediente_activo"].get("id_cliente") == id_cliente:
@@ -80,10 +89,8 @@ with col_resumen:
     if seleccion == "-- Seleccione un Deudor Aprobado --":
         st.warning("Debe seleccionar un cliente aprobado para generar la tabla y proceder a la formalización.")
     else:
-        # 1. Tasa proporcional quincenal
         tasa_quincenal = tasa_mensual / 2.0
         
-        # 2. Fórmula de Anualidad Ordinaria
         if tasa_quincenal > 0:
             cuota_teorica = monto_principal * (tasa_quincenal * (1 + tasa_quincenal)**plazo_quincenas) / ((1 + tasa_quincenal)**plazo_quincenas - 1)
         else:
@@ -91,7 +98,6 @@ with col_resumen:
             
         cuota_fija = round(cuota_teorica, 2)
         
-        # 3. Construcción iterativa con ajuste exacto a $0.00 al cierre
         saldo = round(float(monto_principal), 2)
         fecha_iter = datetime.combine(fecha_desembolso, datetime.min.time())
         
@@ -128,12 +134,20 @@ with col_resumen:
         df_amortizacion = pd.DataFrame(tabla_pagos)
         total_recaudar = round(total_capital + total_interes, 2)
         
-        # Exposición de KPIs
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Capital Otorgado", f"${total_capital:,.2f}")
-        m2.metric("Interés Total Proyectado", f"${total_interes:,.2f}")
-        m3.metric("Monto Total a Recaudar", f"${total_recaudar:,.2f}")
-        m4.metric("Cuota Quincenal Base", f"${cuota_fija:,.2f}")
+        # Cuadrícula simétrica 2x2 para eliminar el amontonamiento de texto y cifras
+        m1, m2 = st.columns(2)
+        with m1:
+            st.metric("Capital Otorgado", f"${total_capital:,.2f}")
+        with m2:
+            st.metric("Interés Total Proyectado", f"${total_interes:,.2f}")
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        m3, m4 = st.columns(2)
+        with m3:
+            st.metric("Monto Total a Recaudar", f"${total_recaudar:,.2f}")
+        with m4:
+            st.metric("Cuota Quincenal Base", f"${cuota_fija:,.2f}")
         
         st.markdown("---")
         
@@ -142,7 +156,6 @@ with col_resumen:
         else:
             st.error("Discrepancia contable detectada en el redondeo.")
             
-        # Preparar paquete de datos para formalización transaccional
         st.session_state["credito_calculado"] = {
             "id_cliente": id_cliente,
             "monto_principal": float(monto_principal),
@@ -157,7 +170,6 @@ with col_resumen:
 
 st.divider()
 
-# Sección de Exportación y Escritura Transaccional en Servidor
 st.subheader("Calendario Detallado de Obligaciones (Anexo al Contrato)")
 
 if "credito_calculado" in st.session_state and st.session_state["credito_calculado"]:
@@ -186,7 +198,7 @@ if "credito_calculado" in st.session_state and st.session_state["credito_calcula
                     "cuota_fija_proyectada": datos_c["cuota_fija_proyectada"],
                     "monto_total_recaudar": datos_c["monto_total_recaudar"],
                     "fecha_desembolso": datos_c["fecha_desembolso"],
-                    "estatus_credito": datos_c["estatus_credito"]
+                    "estatus_credito": "VIGENTE"
                 }
                 try:
                     id_prestamo_gen = formalizar_credito_y_amortización(payload_prestamo, datos_c["tabla_df"])
