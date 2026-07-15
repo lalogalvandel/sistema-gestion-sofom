@@ -43,7 +43,7 @@ class PagarePDF(FPDF):
         self.set_text_color(128)
         self.cell(0, 10, f'Página {self.page_no()} | Documento generado desde Servidor Institucional', 0, 0, 'C')
 
-def generar_pdf_pagare(datos_prestamo, datos_cliente, cuotas_df, lugar_expedicion, aval_nombre):
+def generar_pdf_pagare(datos_prestamo, datos_cliente, cuotas_df, lugar_expedicion, aval_nombre, aval_rfc):
     pdf = PagarePDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=20)
@@ -93,10 +93,11 @@ def generar_pdf_pagare(datos_prestamo, datos_cliente, cuotas_df, lugar_expedicio
     pdf.multi_cell(0, 6, clean_text(texto_clausula), 0, 'J')
     pdf.ln(10)
     
-    # 3. Sección de Firmas
+    # 3. Sección de Firmas (Deudor Principal y Aval Solidario)
     pdf.ln(20)
     y_firma = pdf.get_y()
     
+    # Firma Deudor Principal
     pdf.line(20, y_firma, 85, y_firma)
     pdf.set_xy(20, y_firma + 2)
     pdf.set_font('Arial', 'B', 9)
@@ -107,6 +108,7 @@ def generar_pdf_pagare(datos_prestamo, datos_cliente, cuotas_df, lugar_expedicio
     pdf.set_xy(20, pdf.get_y())
     pdf.cell(65, 4, clean_text(f"RFC: {datos_cliente['rfc'].upper()}"), 0, 1, 'C')
     
+    # Firma Aval / Obligado Solidario (si se ingresó en el formulario)
     if aval_nombre and len(aval_nombre.strip()) > 3:
         pdf.line(115, y_firma, 180, y_firma)
         pdf.set_xy(115, y_firma + 2)
@@ -115,6 +117,9 @@ def generar_pdf_pagare(datos_prestamo, datos_cliente, cuotas_df, lugar_expedicio
         pdf.set_font('Arial', '', 8)
         pdf.set_xy(115, pdf.get_y())
         pdf.cell(65, 4, clean_text(f"{aval_nombre.upper()}"), 0, 1, 'C')
+        if aval_rfc and len(aval_rfc.strip()) >= 10:
+            pdf.set_xy(115, pdf.get_y())
+            pdf.cell(65, 4, clean_text(f"RFC: {aval_rfc.upper()}"), 0, 1, 'C')
         pdf.set_xy(115, pdf.get_y())
         pdf.cell(65, 4, clean_text("Acepto obligación solidaria e incondicional"), 0, 1, 'C')
         
@@ -196,9 +201,13 @@ with col_config:
         id_p = datos_contrato["id_prestamo"]
         
         with st.form("form_emision_pdf"):
+            lugar_exp = st.text_input("Lugar de Expedición (Ciudad / Estado):", value="Puebla, Puebla")
+            
+            st.markdown("---")
+            st.markdown("#### Datos de Garantía Solidaria (Aval)")
             c_p1, c_p2 = st.columns(2)
-            lugar_exp = c_p1.text_input("Lugar de Expedición (Ciudad / Estado):", value="Puebla, Puebla")
-            nombre_aval = c_p2.text_input("Nombre del Aval / Obligado Solidario (Opcional):", placeholder="Ej. María López Morales")
+            nombre_aval = c_p1.text_input("Nombre del Aval / Obligado Solidario:", placeholder="Ej. María López Morales")
+            rfc_aval = c_p2.text_input("RFC del Aval (con homoclave):", max_chars=13, placeholder="Ej. LOMM850321XYZ").upper()
             
             st.markdown("---")
             st.markdown("#### Resumen de Obligación por Contratar")
@@ -234,7 +243,8 @@ with col_config:
                                 datos_cliente=datos_cli,
                                 cuotas_df=df_cuotas_legal,
                                 lugar_expedicion=lugar_exp,
-                                aval_nombre=nombre_aval
+                                aval_nombre=nombre_aval,
+                                aval_rfc=rfc_aval
                             )
                             
                             st.session_state["pdf_generado"] = {
