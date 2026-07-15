@@ -1,13 +1,13 @@
 import streamlit as st
 
 # =============================================================================
-# 1. PALETA DE COLORES (EJECUTIVA DE ALTO CONTRASTE)
+# 1. PALETA DE COLORES INSTITUCIONAL
 # =============================================================================
 PALETA = {
     "marino_900": "#0F172A",  # Pizarra oscuro para textos principales (máxima legibilidad)
-    "marino_800": "#1E293B",  # Azul institucional para bordes y acentos
-    "marino_700": "#334155",  # Tono secundario
-    "azul_600":   "#2563EB",  # Azul rey brillante para métricas activas
+    "marino_800": "#1A365D",  # Azul institucional para bordes y acentos
+    "marino_700": "#2C4A73",  # Tono secundario
+    "azul_600":   "#2B6CB0",  # Azul rey brillante para métricas activas
     "azul_100":   "#EFF6FF",  # Fondo suave
     "verde_lago": "#0D9488",  # Tono financiero estable
     "turquesa":   "#14B8A6",  # Acento secundario
@@ -25,7 +25,7 @@ PALETA = {
     "linea_200":  "#CBD5E1",  # Bordes definidos
     "linea_100":  "#E2E8F0",  # Bordes ligeros
     "superficie": "#FFFFFF",  # Blanco puro para tarjetas
-    "lienzo":     "#F8FAFC",  # Fondo global blanco/gris ejecutivo
+    "lienzo":     "#F8FAFC",  # Fondo global
 }
 
 FUENTE_TITULOS = "'Source Serif 4', Georgia, 'Times New Roman', serif"
@@ -38,7 +38,6 @@ SECUENCIA_GRAFICAS = [
 ]
 
 def plantilla_plotly(fig, altura=300, leyenda=False):
-    """Aplica tipografía, color y márgenes consistentes a cualquier figura Plotly."""
     fig.update_layout(
         height=altura,
         margin=dict(t=30, b=10, l=10, r=10),
@@ -86,42 +85,49 @@ def icono(nombre, color=None, size=18):
     )
 
 # =============================================================================
-# 3. HOJA DE ESTILOS CSS BLINDADA CONTRA MODO OSCURO
+# 3. HOJA DE ESTILOS ARMONIZADA Y BLINDADA
 # =============================================================================
 def aplicar_identidad_visual():
     st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
-    /* Forzar fondo ejecutivo y color de texto global en toda la aplicación */
-    .stApp {{
-        background-color: {PALETA['lienzo']} !important;
-        color: {PALETA['tinta_900']} !important;
-    }}
-    
     html, body, [class*="css"], p, span, div {{
         font-family: {FUENTE_BASE};
         color: {PALETA['tinta_900']};
     }}
     
-    /* Mayor margen superior para evitar que se corten palabras en títulos */
+    /* Evitar cortes de palabras en el techo de la app */
     .block-container {{
-        padding-top: 3.5rem !important;
+        padding-top: 3.8rem !important;
         padding-bottom: 4rem !important;
         max-width: 95% !important;
+    }}
+
+    /* Estilar la barra lateral para que sea elegante y sobria */
+    section[data-testid="stSidebar"] {{
+        border-right: 1px solid {PALETA['linea_200']} !important;
+    }}
+    section[data-testid="stSidebar"] a {{
+        font-weight: 500 !important;
+        color: {PALETA['tinta_600']} !important;
+    }}
+    section[data-testid="stSidebar"] a:hover {{
+        color: {PALETA['marino_800']} !important;
+        background-color: {PALETA['azul_100']} !important;
     }}
 
     /* ---------- Barra superior de módulo ---------- */
     .sofom-topbar {{
         display: flex; align-items: center; justify-content: space-between;
         flex-wrap: wrap; gap: 12px;
-        padding-bottom: 18px; margin-bottom: 12px;
+        padding-bottom: 18px; margin-bottom: 16px;
         border-bottom: 2px solid {PALETA['linea_200']};
     }}
     .sofom-titulo {{
         font-family: {FUENTE_TITULOS}; font-size: 28px; font-weight: 700;
         color: {PALETA['marino_900']} !important; margin: 0 !important;
-        letter-spacing: -0.3px; line-height: 1.25 !important;
+        letter-spacing: -0.3px; line-height: 1.3 !important;
     }}
     .sofom-subtitulo {{
         font-family: {FUENTE_BASE}; font-size: 14px; font-weight: 500;
@@ -134,7 +140,6 @@ def aplicar_identidad_visual():
         color: {PALETA['exito']} !important; background: {PALETA['exito_bg']} !important;
         border: 1px solid {PALETA['exito']}60; border-radius: 20px;
         padding: 6px 14px; white-space: nowrap;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }}
     .sofom-insignia .punto {{
         width: 7px; height: 7px; border-radius: 50%; background: {PALETA['exito']};
