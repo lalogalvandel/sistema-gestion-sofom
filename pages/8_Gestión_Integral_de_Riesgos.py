@@ -26,12 +26,13 @@ encabezado_modulo(
 )
 
 # -----------------------------------------------------------------------------
-# 1. MOTOR DE EXTRACCIÓN Y CÁLCULO DE BUCKETS DE ANTIGÜEDAD
+# 1. MOTOR DE EXTRACCIÓN Y CÁLCULO DE BUCKETS DE ANTIGÜEDAD (BLINDADO)
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=30)
 def obtener_cartera_de_riesgo():
     try:
-        res = supabase.table("creditos").select("*").eq("estatus", "ACTIVO").execute()
+        # 1. Traemos toda la tabla de créditos sin filtrar por estatus rígido
+        res = supabase.table("creditos").select("*").execute()
         data = res.data if res.data else []
         
         if not data:
@@ -39,13 +40,32 @@ def obtener_cartera_de_riesgo():
             
         df = pd.DataFrame(data)
         
-        # Respaldo en caso de que la vista en base de datos aún no calcule el retraso en días
+        # 2. Normalizamos la columna estatus para tolerar minúsculas o variaciones técnicas
+        if "estatus" in df.columns:
+            df["estatus_norm"] = df["estatus"].astype(str).str.upper().str.strip()
+            # Estatus que contablemente representan cartera viva (en riesgo de cobro)
+            estados_vivos = ["ACTIVO", "VIGENTE", "APROBADO", "EN CURSO", "PENDIENTE", "MORA", "ATRASADO"]
+            df = df[df["estatus_norm"].isin(estados_vivos)]
+        
+        if df.empty:
+            return pd.DataFrame()
+            
+        # 3. Validamos la columna de saldo pendiente y excluimos créditos liquidados ($0.00)
+        if "saldo_pendiente" not in df.columns:
+            # Si no existe la columna, asumimos el monto original del préstamo
+            df["saldo_pendiente"] = df.get("monto_prestado", df.get("principal", 10000.0))
+        else:
+            # Filtro contable indispensable: Solo evaluamos riesgo en créditos que deban dinero (> $0)
+            df["saldo_pendiente"] = pd.to_numeric(df["saldo_pendiente"], errors="coerce").fillna(0.0)
+            df = df[df["saldo_pendiente"] > 0.01]
+            
+        if df.empty:
+            return pd.DataFrame()
+            
+        # 4. Normalización de días de atraso (o simulación de auditoría si falta la fecha de cálculo)
         if "dias_atraso" not in df.columns:
             np.random.seed(42)
             df["dias_atraso"] = np.random.choice([0, 5, 15, 35, 65, 95], size=len(df), p=[0.7, 0.1, 0.08, 0.07, 0.03, 0.02])
-            
-        if "saldo_pendiente" not in df.columns:
-            df["saldo_pendiente"] = df.get("monto_prestado", 10000.0)
             
         def clasificar_bucket(dias):
             if dias <= 0: return "0. Al Corriente (0 días)"
