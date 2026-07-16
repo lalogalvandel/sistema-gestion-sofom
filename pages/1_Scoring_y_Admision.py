@@ -22,12 +22,11 @@ aplicar_identidad_visual()
 
 encabezado_modulo(
     titulo="Motor Actuarial de Admisión y Credit Scoring",
-    subtitulo="Evaluación algorítmica de riesgo crediticio, cálculo de Probabilidad de Default (Pd), fijación de Tasa de Indiferencia y formalización de colocación.",
+    subtitulo="Evaluación algorítmica de riesgo crediticio, verificación legal KYC/PLD, fijación de Tasa de Indiferencia y formalización de colocación.",
     nombre_icono="escudo",
     insignia="ORIGINACIÓN INSTITUCIONAL"
 )
 
-# Identificación de sesión para auditoría
 usuario_actual = st.session_state.get("user_email", "Usuario No Identificado")
 rol_actual = st.session_state.get("user_role", "COBRANZA")
 
@@ -39,26 +38,18 @@ def inicializar_motor_scoring():
     """
     Entrena y calibra un modelo de Regresión Logística utilizando una distribución
     estadística base que refleja el comportamiento histórico de cartera en SOFOMs ENR.
-    Esto permite calificar solicitudes desde el día uno sin depender de vacíos históricos.
     """
     np.random.seed(108)
     n_muestras = 1000
     
-    # Generación de variables independientes (Features)
-    # 1. Ratio de Cobertura de Deuda (Ingreso Libre / Cuota Estimada)
     ratio_cobertura = np.random.normal(1.8, 0.6, n_muestras).clip(0.2, 5.0)
-    # 2. Antigüedad Laboral o Operativa del Negocio (Años)
     antiguedad = np.random.exponential(3.5, n_muestras).clip(0.1, 25.0)
-    # 3. Ratio de Apalancamiento (Monto Solicitado / Patrimonio Neto)
     apalancamiento = np.random.normal(0.45, 0.25, n_muestras).clip(0.05, 2.0)
-    # 4. Historial de Atrasos Previos en Buró (0 = Limpio, 3 = Severo)
     mora_previa = np.random.choice([0, 1, 2, 3], size=n_muestras, p=[0.68, 0.18, 0.09, 0.05])
     
-    # Ecuación estructural de log-odds para incumplimiento crediticio
     log_odds = (-2.2 * ratio_cobertura) - (0.35 * antiguedad) + (2.8 * apalancamiento) + (1.4 * mora_previa) + 0.8
     probabilidades = 1.0 / (1.0 + np.exp(-log_odds))
     
-    # Variable dependiente (0 = Cumplimiento, 1 = Default)
     y = (probabilidades > np.random.uniform(0, 1, n_muestras)).astype(int)
     
     X = pd.DataFrame({
@@ -79,11 +70,39 @@ def inicializar_motor_scoring():
 modelo_scoring, escalador_features = inicializar_motor_scoring()
 
 # -----------------------------------------------------------------------------
-# 2. CAPTURA DE EXPEDIENTE Y VARIABLES PARAMÉTRICAS
+# 2. BÓVEDA DIGITAL DE EXPEDIENTES Y VERIFICACIÓN LEGAL (KYC / PLD)
 # -----------------------------------------------------------------------------
-titulo_seccion("personas", "1. Expediente de Solicitud y Perfil Financiero")
+titulo_seccion("documento", "1. Bóveda Digital de Expediente y Consentimiento Legal")
 
 st.markdown(f"**Funcionario Evaluador en Sesión:** `{usuario_actual}` ({rol_actual})")
+
+st.markdown("""
+**Protocolo Institucional de Auto-Consulta Asistida (Costo $0.00 MXN para la SOFOM):**
+En estricto apego al Artículo 40 de la Ley para Regular las Sociedades de Información Crediticia (LRSIC), el solicitante tiene derecho a obtener su Reporte de Crédito Especial (RCE) en formato PDF de forma gratuita una vez cada 12 meses. Para procesar la solicitud sin costo de investigación ni fricción operativa, el solicitante debe aportar su documento oficial descargado directamente desde las centrales de riesgo o, en su defecto, sus últimos 3 estados de cuenta bancarios para acreditación de flujo de caja.
+
+* **Portal Oficial Buró de Crédito:** [www.burodecredito.com.mx](https://www.burodecredito.com.mx)
+* **Portal Oficial Círculo de Crédito:** [www.circulodecredito.com.mx](https://www.circulodecredito.com.mx)
+""")
+
+col_doc1, col_doc2 = st.columns([1, 1.2])
+
+with col_doc1:
+    st.markdown("**Carga de Expediente Digital (PDF obligatoria):**")
+    archivo_kyc = st.file_uploader("Adjuntar Reporte de Buró de Crédito o Estados de Cuenta (PDF):", type=["pdf"])
+
+with col_doc2:
+    st.markdown("**Validación Jurídica de Consentimiento (Innegociable):**")
+    declaracion_legal = st.checkbox(
+        "**Declaración Legal de Consentimiento y Veracidad (Art. 28 LRSIC y Disposiciones PLD):**\n"
+        "Bajo protesta de decir verdad, el solicitante declara que el documento digital adjunto fue obtenido por su propia cuenta de manera legítima y lo otorga voluntariamente a la SOFOM para el análisis y evaluación de su solvencia crediticia. Asimismo, autoriza expresamente a la entidad para realizar consultas y reportes periódicos a las Sociedades de Información Crediticia durante la vigencia de la relación comercial."
+    )
+
+st.divider()
+
+# -----------------------------------------------------------------------------
+# 3. CAPTURA DE PARAMÉTRICOS Y EVALUACIÓN FINANCIERA
+# -----------------------------------------------------------------------------
+titulo_seccion("personas", "2. Expediente Paramétrico y Perfil Financiero")
 
 with st.form("form_evaluacion_crediticia"):
     st.markdown("**Datos Generales del Solicitante**")
@@ -119,33 +138,36 @@ with st.form("form_evaluacion_crediticia"):
         
     c_mora1, c_mora2 = st.columns([1, 2])
     with c_mora1:
-        mora_buro = st.selectbox("Historial de Atrasos en Buró de Crédito:", [
-            (0, "Sin atrasos reportados (0 días)"),
-            (1, "Atraso leve histórico (1 a 30 días)"),
-            (2, "Atraso moderado histórico (31 a 60 días)"),
-            (3, "Atraso severo o marca negativa (> 60 días)")
+        mora_buro = st.selectbox("Clasificación de Historial en Buró de Crédito (Acreditado en PDF):", [
+            (0, "0. Sin atrasos reportados en historial (0 días)"),
+            (1, "1. Atraso leve histórico (1 a 30 días)"),
+            (2, "2. Atraso moderado histórico (31 a 60 días)"),
+            (3, "3. Atraso severo o marca negativa (> 60 días)")
         ], format_func=lambda x: x[1])[0]
     with c_mora2:
         st.markdown("<br>", unsafe_allow_html=True)
-        st.caption("Nota Técnica: El modelo procesa la relación de cobertura sobre cuota estimada y evalúa el apalancamiento real contra la garantía líquida o patrimonial aportada.")
+        st.caption("Nota de Auditoría: El parámetro seleccionado en esta casilla debe coincidir de forma estricta con el comportamiento reflejado en el documento PDF adjuntado en la Sección 1.")
 
     st.markdown("<br>", unsafe_allow_html=True)
     ejecutar_evaluacion = st.form_submit_button("Ejecutar Motor de Inteligencia y Calcular Tasa", use_container_width=True)
 
 # -----------------------------------------------------------------------------
-# 3. PROCESAMIENTO ALGORÍTMICO Y DICTAMEN DE RIESGO
+# 4. PROCESAMIENTO ALGORÍTMICO Y DICTAMEN DE RIESGO
 # -----------------------------------------------------------------------------
 if ejecutar_evaluacion:
-    if not nombre_cliente or len(rfc_cliente) < 10:
-        st.warning("Debe ingresar el nombre completo y un RFC válido para formalizar la evaluación crediticia.")
+    # Candado de Seguridad Legal y Operativa
+    if not archivo_kyc:
+        st.error("BLOQUEO DE AUDITORÍA: No se puede ejecutar el modelo de scoring si no se ha adjuntado el expediente digital (PDF) en la Bóveda de Consentimiento.")
+    elif not declaracion_legal:
+        st.error("BLOQUEO LEGAL: Es indispensable validar la casilla de Declaración Legal de Consentimiento (Art. 28 LRSIC) para procesar la evaluación crediticia.")
+    elif not nombre_cliente or len(rfc_cliente) < 10:
+        st.warning("Debe ingresar la razón social completa y un RFC válido con homoclave para formalizar la evaluación.")
     else:
-        # Cálculo de variables financieras intermedias
-        cuota_mensual_estimada = (monto_solicitado / plazo_meses) * 1.06 # Estimación base para estrés de flujo
+        cuota_mensual_estimada = (monto_solicitado / plazo_meses) * 1.06
         ingreso_disponible = max(ingreso_mensual - gastos_fijos, 0.01)
         ratio_cobertura_calc = round(ingreso_disponible / cuota_mensual_estimada, 2)
         ratio_apalancamiento_calc = round(monto_solicitado / max(patrimonio_garantia, 1.0), 2)
         
-        # Construcción de vector para scikit-learn
         vector_cliente = pd.DataFrame({
             "ratio_cobertura": [ratio_cobertura_calc],
             "antiguedad": [antiguedad_anios],
@@ -155,18 +177,14 @@ if ejecutar_evaluacion:
         
         vector_escalado = escalador_features.transform(vector_cliente)
         
-        # Predicción de Probabilidad de Default (Pd)
         prob_default = float(modelo_scoring.predict_proba(vector_escalado)[:, 1][0])
         
-        # Mapeo a Escala Credit Score Estándar (300 a 850)
         score_crediticio = int(850 - (prob_default * 550))
         score_crediticio = max(min(score_crediticio, 850), 300)
         
-        # Cálculo Actuarial de Tasa de Indiferencia: T = (Cc + Oe + Rp) / (1 - Pd)
-        costo_capital_anual = 0.12 # 12% rendimiento base socios
-        gasto_operativo_anual = 0.04 # 4% costo operativo institucional
+        costo_capital_anual = 0.12
+        gasto_operativo_anual = 0.04
         
-        # Prima de riesgo dinámica por nivel de calificación
         if score_crediticio >= 750:
             prima_riesgo_anual = 0.02
             calificacion_grado = "Grado de Inversión Superior (AAA)"
@@ -193,35 +211,33 @@ if ejecutar_evaluacion:
             estatus_dictamen = "APROBADO PREFERENCIAL" if score_crediticio >= 700 else "APROBADO CONDICIONADO"
 
         st.divider()
-        titulo_seccion("estadisticas", "2. Dictamen del Comité Algorítmico y Pricing")
+        titulo_seccion("estadisticas", "3. Dictamen del Comité Algorítmico y Pricing")
         
-        # Despliegue de métricas en tarjetas ejecutivas
         k1, k2, k3, k4 = st.columns(4)
         with k1:
             tarjeta_kpi("Score Crediticio", f"{score_crediticio} pts", calificacion_grado)
         with k2:
-            color_pd = "🟢 Bajo Riesgo" if prob_default < 0.06 else ("🟡 Moderado" if prob_default < 0.12 else "🔴 Alto Riesgo")
-            tarjeta_kpi("Probabilidad de Default (Pd)", f"{prob_default*100:.2f}%", color_pd)
+            nivel_pd = "BAJO RIESGO" if prob_default < 0.06 else ("MODERADO" if prob_default < 0.12 else "ALTO RIESGO")
+            tarjeta_kpi("Probabilidad de Default (Pd)", f"{prob_default*100:.2f}%", f"Nivel: {nivel_pd}")
         with k3:
             tarjeta_kpi("Ratio Cobertura Deuda", f"{ratio_cobertura_calc}x", "Mínimo exigido: 1.20x")
         with k4:
             if estatus_dictamen == "RECHAZADO":
-                tarjeta_kpi("Tasa Mensual Sugerida", "N/A", "Operación Invialble")
+                tarjeta_kpi("Tasa Mensual Sugerida", "N/A", "Operación Inviable")
             else:
                 tarjeta_kpi("Tasa de Indiferencia", f"{tasa_mensual_asignada}% mensual", f"{tasa_anual_asignada}% anualizada")
 
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # Emisión de dictamen corporativo
         if estatus_dictamen == "RECHAZADO":
             dictamen("peligro", "Dictamen: SOLICITUD RECHAZADA POR RIESGO ACTUARIAL", 
                      f"El modelo algorítmico determina una Probabilidad de Incumplimiento del **{prob_default*100:.2f}%** (Score: **{score_crediticio}**). La relación de cobertura de deuda de **{ratio_cobertura_calc}x** y el nivel de apalancamiento no cumplen con los parámetros del umbral de solvencia. Autorizar esta colocación generaría un valor patrimonial negativo para el fondo.")
         else:
             dictamen("exito", f"Dictamen: SOLICITUD {estatus_dictamen}", 
-                     f"El perfil evaluado acredita solvencia técnica con un Score de **{score_crediticio}** y una Probabilidad de Incumplimiento de **{prob_default*100:.2f}%**. Para garantizar la rentabilidad operativa del 20% y el rendimiento del capital social, la **Tasa de Indiferencia asignada es de {tasa_mensual_asignada}% mensual** ({tasa_anual_asignada}% anual).")
+                     f"El perfil evaluado acredita solvencia técnica con un Score de **{score_crediticio}** y una Probabilidad de Incumplimiento de **{prob_default*100:.2f}%**. Para garantizar la rentabilidad operativa del 20% y el rendimiento del capital social, la **Tasa de Indiferencia asignada es de {tasa_mensual_asignada}% mensual** ({tasa_anual_asignada}% anual). Documento KYC auditable: {archivo_kyc.name}.")
 
             st.markdown("<br>", unsafe_allow_html=True)
-            titulo_seccion("documento_check", "3. Formalización y Alta en Cartera de Préstamos")
+            titulo_seccion("documento_check", "4. Formalización y Alta en Cartera de Préstamos")
             
             st.markdown("Al confirmar la colocación, el sistema registrará el crédito en el servidor y habilitará la emisión de pagarés y tablas de amortización con la tasa actuarial asignada.")
             
@@ -230,9 +246,8 @@ if ejecutar_evaluacion:
                 btn_guardar_prestamo = st.button("Formalizar y Enviar a Cartera Viva", use_container_width=True, type="primary")
             
             if btn_guardar_prestamo:
-                with st.spinner("Inscribiendo contrato en la base de datos central..."):
+                with st.spinner("Inscribiendo contrato y metadata de auditoría en la base de datos central..."):
                     try:
-                        # Cálculo de fechas operativas
                         fecha_corte_actual = datetime.now()
                         dias_periodo = 15 if frecuencia_pago == "Quincenal" else 30
                         fecha_primer_vencimiento = fecha_corte_actual + timedelta(days=dias_periodo)
@@ -251,12 +266,11 @@ if ejecutar_evaluacion:
                             "estatus": "ACTIVO",
                             "fecha_otorgamiento": fecha_corte_actual.strftime("%Y-%m-%d"),
                             "proximo_vencimiento": fecha_primer_vencimiento.strftime("%Y-%m-%d"),
-                            "gestor_originador": usuario_actual
+                            "gestor_originador": f"{usuario_actual} | Doc: {archivo_kyc.name}"
                         }
                         
-                        # Inserción directa en la tabla de préstamos confirmada por auditoría
                         supabase.table("prestamos").insert(payload_prestamo).execute()
                         
-                        st.success(f"El crédito a nombre de {nombre_cliente} fue formalizado exitosamente con una tasa de {tasa_mensual_asignada}% mensual. Ya se encuentra disponible en la Ventanilla de Cobranza y en el Centro de Riesgos.")
+                        st.success(f"El crédito a nombre de {nombre_cliente} fue formalizado exitosamente con una tasa de {tasa_mensual_asignada}% mensual. El registro incluye la trazabilidad del archivo '{archivo_kyc.name}' bajo responsabilidad de {usuario_actual}.")
                     except Exception as e:
                         dictamen("peligro", "Nota de Conexión SQL", f"La evaluación algorítmica se ejecutó con éxito y el pricing está confirmado. Para persistir el alta automática, asegúrese de que la tabla 'prestamos' cuente con las columnas compatibles en Supabase. Detalle: {str(e)}")
