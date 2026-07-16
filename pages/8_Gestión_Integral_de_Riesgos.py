@@ -26,12 +26,12 @@ encabezado_modulo(
 )
 
 # -----------------------------------------------------------------------------
-# 1. MOTOR DE EXTRACCIÓN Y CÁLCULO DE BUCKETS DE ANTIGÜEDAD (ADAPTADO A ESQUEMA REAL)
+# 1. MOTOR DE EXTRACCIÓN Y CÁLCULO DE BUCKETS DE ANTIGÜEDAD
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=30)
 def obtener_cartera_de_riesgo():
     try:
-        # 1. Consultamos tu tabla real en SQL: "prestamos"
+        # 1. Consultamos la tabla real de colocación crediticia: "prestamos"
         res = supabase.table("prestamos").select("*").execute()
         data = res.data if res.data else []
         
@@ -51,7 +51,6 @@ def obtener_cartera_de_riesgo():
             return pd.DataFrame()
             
         # 3. Mapeo inteligente del Saldo Pendiente o Monto Otorgado
-        # Buscamos la columna de saldo; si no está, tomamos el monto inicial prestado
         col_saldo = None
         for posible_nombre in ["saldo_pendiente", "saldo", "monto_pendiente", "total_a_pagar", "monto_prestado", "monto", "principal"]:
             if posible_nombre in df.columns:
@@ -60,16 +59,15 @@ def obtener_cartera_de_riesgo():
                 
         if col_saldo:
             df["saldo_pendiente"] = pd.to_numeric(df[col_saldo], errors="coerce").fillna(0.0)
-            # Excluimos registros que ya no representen riesgo contable (saldo pagado)
+            # Excluimos registros que ya no representen riesgo contable (saldo pagado o liquidado)
             df = df[df["saldo_pendiente"] > 0.01]
         else:
-            # Si no encuentra ninguna columna conocida, asigna un valor base para evaluación
             df["saldo_pendiente"] = 15000.00
             
         if df.empty:
             return pd.DataFrame()
             
-        # 4. Cálculo de días de atraso (o simulación estadística para auditoría en pantalla)
+        # 4. Normalización de días de atraso (o simulación estadística para auditoría visual en pantalla)
         if "dias_atraso" not in df.columns:
             np.random.seed(42)
             df["dias_atraso"] = np.random.choice([0, 5, 15, 35, 65, 95], size=len(df), p=[0.7, 0.1, 0.08, 0.07, 0.03, 0.02])
@@ -83,7 +81,7 @@ def obtener_cartera_de_riesgo():
             
         df["Bucket"] = df["dias_atraso"].apply(clasificar_bucket)
         return df
-    except Exception as e:
+    except Exception:
         return pd.DataFrame()
 
 df_cartera = obtener_cartera_de_riesgo()
@@ -193,7 +191,7 @@ st.divider()
 # -----------------------------------------------------------------------------
 titulo_seccion("documento", "3. Bitácora de Gestión Extrajudicial y Contenciosa")
 
-# Capturamos los datos del usuario logueado en la sesión
+# Capturamos los datos de identidad y privilegios en la sesión
 usuario_actual = st.session_state.get("user_email", "Usuario No Identificado")
 rol_actual = st.session_state.get("user_role", "AUDITOR")
 es_auditor_solo_lectura = (rol_actual == "AUDITOR")
@@ -203,28 +201,26 @@ col_bitacora, col_historial = st.columns([1, 1.5])
 with col_bitacora:
     st.markdown("**Registro Legal de Intervención:**")
     
-    # Sello institucional de quién está operando el módulo
-    st.caption(f"🏛️ Gestor Responsable en Sesión: **{usuario_actual}** ({rol_actual})")
+    # Sello institucional de responsabilidad
+    st.caption(f"Gestor Responsable en Sesión: **{usuario_actual}** (Perfil: {rol_actual})")
     
     if es_auditor_solo_lectura:
-        st.warning("⚠️ Su perfil institucional (AUDITOR) tiene permisos exclusivos de consulta y supervisión. No está habilitado para registrar intervenciones ni modificar expedientes en este módulo.")
+        st.warning("Aviso Institucional: Su perfil de usuario (AUDITOR) cuenta con facultades exclusivas de supervisión y consulta. El registro y edición de intervenciones extrajudiciales o contenciosas se encuentra inhabilitado para mantener la independencia de auditoría.")
     
     with st.form("form_bitacora_cobranza"):
         id_credito_ref = st.text_input("Folio o RFC del Crédito en Mora:", placeholder="Ej: RFC o Contrato #1024", disabled=es_auditor_solo_lectura)
         tipo_accion = st.selectbox("Clasificación del Acto Operativo:", [
-            "Gestión Telefónica - Acuerdo de Pago",
-            "Notificación Electrónica - Aviso de Vencimiento",
-            "Carta Convenio - Reestructura de Adeudo",
-            "Turnado a Despacho Externo - Proceso Contencioso",
-            "Inspección Presencial - Verificación de Domicilio"
+            "Gestión Extrajudicial - Acuerdo Telefónico de Pago",
+            "Notificación Electrónica - Aviso Formal de Vencimiento",
+            "Carta Convenio - Suscripción de Reestructura de Adeudo",
+            "Turnado a Despacho Externo - Inicio de Proceso Contencioso",
+            "Inspección Presencial - Verificación Domiciliaria de Garantías"
         ], disabled=es_auditor_solo_lectura)
         
         fecha_promesa = st.date_input("Fecha Límite Compromiso:", disabled=es_auditor_solo_lectura)
         notas_gestion = st.text_area("Declaraciones y Extracto de la Gestión:", placeholder="El acreditado manifiesta retraso por insolvencia temporal. Suscribe compromiso de liquidación parcial en la fecha estipulada.", disabled=es_auditor_solo_lectura)
         
         st.markdown("<br>", unsafe_allow_html=True)
-        
-        # El botón se bloquea si el usuario es solo Auditor
         guardar_bitacora = st.form_submit_button("Anexar Gestión al Expediente", use_container_width=True, disabled=es_auditor_solo_lectura)
         
         if guardar_bitacora and not es_auditor_solo_lectura:
@@ -252,7 +248,6 @@ with col_historial:
         res_bit = supabase.table("bitacora_cobranza").select("*").order("fecha_registro", desc=True).limit(10).execute()
         if res_bit.data:
             df_bit = pd.DataFrame(res_bit.data)
-            # Renombramos columnas para presentarlas de manera ejecutiva
             df_bit_presentacion = df_bit[["fecha_registro", "id_credito_ref", "tipo_accion", "usuario_gestor"]].copy()
             df_bit_presentacion.columns = ["Fecha UTC", "Referencia", "Intervención", "Gestor Firmante"]
             st.dataframe(df_bit_presentacion, use_container_width=True)
