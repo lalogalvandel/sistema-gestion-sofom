@@ -129,8 +129,8 @@ else:
     # Variables financieras del crédito
     monto_op = float(fila_credito.get(col_mon, 15000.0)) if col_mon else 15000.0
     # Opción segura: verificamos si la columna existe antes de intentar convertir
-col_plazo = "plazo_meses" if "plazo_meses" in fila_credito else ("plazo" if "plazo" in fila_credito else None)
-plazo_op = int(fila_credito[col_plazo]) if col_plazo and pd.notna(fila_credito[col_plazo]) else 12
+    col_plazo = "plazo_meses" if "plazo_meses" in fila_credito else ("plazo" if "plazo" in fila_credito else None)
+    plazo_op = int(fila_credito[col_plazo]) if col_plazo and pd.notna(fila_credito[col_plazo]) else 12
     tasa_mes_op = float(fila_credito.get("tasa_mensual", fila_credito.get("tasa", 6.0)))
     frec_op = str(fila_credito.get("frecuencia", "Mensual")).capitalize()
     nombre_cliente_op = str(fila_credito.get(col_nom, "Acreditado Instituconal"))
