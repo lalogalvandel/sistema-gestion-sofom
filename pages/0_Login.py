@@ -33,7 +33,7 @@ if submit:
                     
                     st.success(f"Bienvenido. Sesión iniciada con perfil: {usuario['rol']}")
                     # Redirigir al dashboard principal después de loguear
-                    st.switch_page("pages/3_Dashboard.py")
+                    st.switch_page("pages/3_Dashboard_Gerencial.py")
                 else:
                     dictamen("peligro", "Error de Autenticación", "Las credenciales ingresadas no son válidas o el usuario no existe.")
             except Exception as e:
