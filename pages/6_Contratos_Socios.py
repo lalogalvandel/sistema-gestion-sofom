@@ -9,7 +9,8 @@ from src.theme import (
 
 st.set_page_config(page_title="Legal Socios | SOFOM", layout="wide")
 aplicar_identidad_visual()
-
+from src.auth import verificar_acceso
+verificar_acceso("ADMIN")
 encabezado_modulo(
     titulo="Emisión de Contratos de Asociación en Participación",
     subtitulo="Generación de instrumentos mercantiles solemnes para la formalización del capital de inversión.",

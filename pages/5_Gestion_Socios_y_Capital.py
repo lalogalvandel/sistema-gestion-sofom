@@ -8,7 +8,8 @@ from src.theme import (
 )
 
 st.set_page_config(page_title="Gestión de Capital y Socios | SOFOM", layout="wide")
-
+from src.auth import verificar_acceso
+verificar_acceso("ADMIN")
 # 1. Inyectar identidad visual
 aplicar_identidad_visual()
 

@@ -10,7 +10,8 @@ from src.theme import (
 
 st.set_page_config(page_title="Gestión de Usuarios | SOFOM", layout="wide")
 aplicar_identidad_visual()
-
+from src.auth import verificar_acceso
+verificar_acceso("ADMIN")
 # --- BLINDAJE DE SEGURIDAD (SOLO ADMIN) ---
 verificar_acceso("ADMIN")
 # ------------------------------------------

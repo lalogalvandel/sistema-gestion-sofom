@@ -9,7 +9,8 @@ from src.theme import (
 
 st.set_page_config(page_title="Control de Cobranza | SOFOM", layout="wide")
 aplicar_identidad_visual()
-
+from src.auth import verificar_acceso
+verificar_acceso("COBRANZA")
 encabezado_modulo(
     titulo="Ventanilla de Cobranza y Gestión de Capital",
     subtitulo="Procesamiento de pagos con prelación (Interés > Capital) y recálculo automático de saldos.",

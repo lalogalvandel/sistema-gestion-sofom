@@ -7,7 +7,8 @@ from src.theme import (
 )
 
 st.set_page_config(page_title="Motor de Scoring | SOFOM", layout="wide")
-
+from src.auth import verificar_acceso
+verificar_acceso("COBRANZA")
 # 1. Inyectar identidad visual y encabezado modular
 aplicar_identidad_visual()
 
