@@ -18,11 +18,10 @@ encabezado_modulo(
 )
 
 # -----------------------------------------------------------------------------
-# LÓGICA DE RECALCULO DE AMORTIZACIÓN (AL REDUCIR CAPITAL)
+# LÓGICA DE RECALCULO DE AMORTIZACIÓN
 # -----------------------------------------------------------------------------
 def recalcular_calendario(id_prestamo, nuevo_saldo, tasa_mensual, cuotas_restantes, fecha_base):
     tasa_q = tasa_mensual / 2
-    # Recalculamos cuota fija con el nuevo saldo y plazos restantes
     if tasa_q > 0:
         nueva_cuota = nuevo_saldo * (tasa_q * (1 + tasa_q)**cuotas_restantes) / ((1 + tasa_q)**cuotas_restantes - 1)
     else:
@@ -58,49 +57,82 @@ def recalcular_calendario(id_prestamo, nuevo_saldo, tasa_mensual, cuotas_restant
 # -----------------------------------------------------------------------------
 # DASHBOARD COBRANZA
 # -----------------------------------------------------------------------------
-# (El código del dashboard sigue igual, solo modificamos el if procesar:)
-# --- [REEMPLAZA SOLO ESTA PARTE EN TU CÓDIGO ACTUAL] ---
+# KPI superiores
+@st.cache_data(ttl=15)
+def obtener_resumen_cobranza():
+    try:
+        res = supabase.table("cobranza_y_comisiones").select("monto_recibido, interes_real_cobrado, comision_operador, reserva_riesgo, utilidad_socios").execute()
+        if res.data and len(res.data) > 0:
+            df_c = pd.DataFrame(res.data)
+            return float(df_c["monto_recibido"].sum()), float(df_c["interes_real_cobrado"].sum()), float(df_c["comision_operador"].sum()), float(df_c["utilidad_socios"].sum())
+        return 0.0, 0.0, 0.0, 0.0
+    except:
+        return 0.0, 0.0, 0.0, 0.0
 
-                procesar = st.form_submit_button("Registrar Pago y Ejecutar Reparto", use_container_width=True)
+recibido_hist, interes_hist, comision_hist, utilidad_hist = obtener_resumen_cobranza()
+
+k1, k2 = st.columns(2)
+with k1:
+    tarjeta_kpi("billetera", "Total Recaudado en Caja", f"${recibido_hist:,.2f}", "Flujo acumulado", "marino_800")
+with k2:
+    tarjeta_kpi("porcentaje", "Interés Real Cobrado", f"${interes_hist:,.2f}", "Base para retribuciones", "azul_600")
+
+st.markdown("<br>", unsafe_allow_html=True)
+k3, k4 = st.columns(2)
+with k3:
+    tarjeta_kpi("escudo", "Tu Comisión (20%)", f"${comision_hist:,.2f}", "Ingreso Administrador", "dorado_600")
+with k4:
+    tarjeta_kpi("personas", "Utilidad Socios", f"${utilidad_hist:,.2f}", "65% Interés + Capital", "verde_lago")
+
+st.divider()
+
+# Ventanilla
+titulo_seccion("caja", "2. Ventanilla de Cobranza")
+prestamos_activos = supabase.table("prestamos").select("id_prestamo, monto_principal, clientes(nombre_completo)").eq("estatus_credito", "VIGENTE").execute().data or []
+
+col_sel, col_operacion = st.columns([1, 1.4])
+with col_sel:
+    opciones = ["-- Seleccione Crédito --"] + [f"{p['clientes']['nombre_completo']} | ${p['monto_principal']:,.2f}" for p in prestamos_activos]
+    mapa = {f"{p['clientes']['nombre_completo']} | ${p['monto_principal']:,.2f}": p for p in prestamos_activos}
+    credito_sel = st.selectbox("Expediente:", options=opciones)
+
+with col_operacion:
+    if credito_sel != "-- Seleccione Crédito --":
+        p = mapa[credito_sel]
+        cuota_pend = supabase.table("plan_amortizacion").select("*").eq("id_prestamo", p["id_prestamo"]).eq("estatus_pago", "PENDIENTE").order("numero_cuota").limit(1).execute().data
+        
+        if cuota_pend:
+            c = cuota_pend[0]
+            with st.form("cobro"):
+                st.info(f"Vencimiento: Q{c['numero_cuota']} | {c['fecha_vencimiento']}")
+                monto_recibido_real = st.number_input("Monto Real Recibido ($):", value=float(c['cuota_fija']))
                 
-                if procesar:
-                    with st.spinner("Conciliando cuenta y recalculando calendario..."):
-                        try:
-                            # 1. Registrar el pago en cobranza
-                            payload_pago = {
-                                "id_cuota": id_cuota,
-                                "monto_recibido": monto_recibido_real,
-                                "interes_real_cobrado": interes_real,
-                                "comision_operador": comision_calc,
-                                "reserva_riesgo": reserva_calc,
-                                "utilidad_socios": utilidad_calc
-                            }
-                            supabase.table("cobranza_y_comisiones").insert(payload_pago).execute()
+                # Prelación
+                interes_real = float(c['interes_cobrado']) if monto_recibido_real >= float(c['interes_cobrado']) else monto_recibido_real
+                abono_cap_real = round(monto_recibido_real - interes_real, 2)
+                
+                if st.form_submit_button("Registrar Pago"):
+                    # 1. Registrar pago
+                    supabase.table("cobranza_y_comisiones").insert({
+                        "id_cuota": c["id_cuota"],
+                        "monto_recibido": monto_recibido_real,
+                        "interes_real_cobrado": interes_real,
+                        "comision_operador": round(interes_real * 0.20, 2),
+                        "reserva_riesgo": round(interes_real * 0.15, 2),
+                        "utilidad_socios": round((interes_real * 0.65) + abono_cap_real, 2)
+                    }).execute()
+                    
+                    # 2. Recalculo si hubo abono a capital
+                    if abono_cap_real > 0:
+                        prestamo = supabase.table("prestamos").select("*").eq("id_prestamo", p["id_prestamo"]).single().execute().data
+                        cuotas_futuras = supabase.table("plan_amortizacion").select("*").eq("id_prestamo", p["id_prestamo"]).eq("estatus_pago", "PENDIENTE").execute().data
+                        supabase.table("plan_amortizacion").delete().eq("id_prestamo", p["id_prestamo"]).eq("estatus_pago", "PENDIENTE").execute()
+                        nuevas = recalcular_calendario(p["id_prestamo"], float(c["saldo_insoluto"]) - abono_cap_real, prestamo["tasa_interes_mensual"], len(cuotas_futuras), datetime.strptime(c["fecha_vencimiento"], "%Y-%m-%d"))
+                        for f in nuevas:
+                            f["id_prestamo"] = p["id_prestamo"]
+                            supabase.table("plan_amortizacion").insert(f).execute()
                             
-                            # 2. Si hubo abono a capital, eliminar cuotas futuras y regenerar
-                            if abono_cap_real > 0:
-                                # Obtener datos del préstamo para recálculo
-                                prestamo = supabase.table("prestamos").select("*").eq("id_prestamo", id_p).single().execute().data
-                                
-                                # Obtener cuotas pendientes (excluyendo la actual que acabamos de pagar)
-                                cuotas_futuras = supabase.table("plan_amortizacion").select("*").eq("id_prestamo", id_p).eq("estatus_pago", "PENDIENTE").execute().data
-                                
-                                # Borrar las viejas cuotas
-                                supabase.table("plan_amortizacion").delete().eq("id_prestamo", id_p).eq("estatus_pago", "PENDIENTE").execute()
-                                
-                                # Recalcular nuevo saldo
-                                nuevo_saldo_total = float(cuota_pend["saldo_insoluto"]) - abono_cap_real
-                                nuevas_filas = recalcular_calendario(id_p, nuevo_saldo_total, prestamo["tasa_interes_mensual"], len(cuotas_futuras), datetime.strptime(fecha_venc, "%Y-%m-%d"))
-                                
-                                # Insertar nuevas cuotas
-                                for fila in nuevas_filas:
-                                    fila["id_prestamo"] = id_p
-                                    supabase.table("plan_amortizacion").insert(fila).execute()
-                                    
-                            # 3. Marcar actual como pagada
-                            supabase.table("plan_amortizacion").update({"estatus_pago": "PAGADO"}).eq("id_cuota", id_cuota).execute()
-                            
-                            dictamen("exito", "Pago Procesado", f"Abono de ${monto_recibido_real:,.2f} aplicado. Si hubo reducción de capital, el calendario futuro ha sido recalculado automáticamente.")
-                            st.rerun()
-                        except Exception as e:
-                            dictamen("peligro", "Error de servidor", str(e))
+                    supabase.table("plan_amortizacion").update({"estatus_pago": "PAGADO", "abono_capital": abono_cap_real, "interes_cobrado": interes_real}).eq("id_cuota", c["id_cuota"]).execute()
+                    st.rerun()
+        else:
+            dictamen("exito", "Crédito al corriente", "No hay cuotas pendientes.")
