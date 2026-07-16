@@ -296,7 +296,8 @@ def generar_pdf_instrumento_legal():
         pdf.cell(0, 4, limpiar_txt(f"Firma autógrafa / digital: {nombre_cliente_op}"), align="C", ln=True)
         pdf.cell(0, 4, limpiar_txt(f"RFC: {rfc_cliente_op} | Acepto incondicionalmente"), align="C", ln=True)
         
-    return pdf.output(dest="S").encode("latin-1", "replace")
+    # Ajuste nativo para fpdf2: extrae el flujo de bytes directamente sin parámetros obsoletos
+    return bytes(pdf.output())
 
 # -----------------------------------------------------------------------------
 # 5. EMISIÓN Y DESCARGA DEL INSTRUMENTO
