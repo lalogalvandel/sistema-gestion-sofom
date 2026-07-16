@@ -89,9 +89,13 @@ else:
     titulo_seccion("documento_check", "2. Parámetros del Contrato")
     
     with st.form("form_contrato"):
+        
+        porcentaje_socio = df_cap_table.loc[df_cap_table['id_socio'] == datos_s['id_socio'], 'Porcentaje (%)'].values[0]
+        
         c1, c2 = st.columns(2)
-        monto = c1.number_input("Capital aportado ($):", value=50000.0, step=1000.0)
-        pct = c2.number_input("Porcentaje de participación (%):", value=10.0, step=0.5)
+        monto = c1.number_input("Capital aportado ($):", value=float(df_cap_table.loc[df_cap_table['id_socio'] == datos_s['id_socio'], 'Capital Aportado ($)'].values[0]), disabled=True)
+        # El porcentaje se bloquea (disabled=True) para que sea la verdad absoluta del Cap Table
+        pct = c2.number_input("Porcentaje de participación (%):", value=float(porcentaje_socio), disabled=True)
         vigencia = st.number_input("Vigencia (meses):", value=12)
         
         btn_gen = st.form_submit_button("Generar Contrato PDF", use_container_width=True)
