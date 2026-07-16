@@ -66,7 +66,7 @@ with col_operaciones:
                             dictamen("peligro", "Error de Registro", f"No se pudo completar la operación. Detalle: {str(e)}")
 
     with pestaña_reset:
-        st.markdown("*Use esta herramienta cuando un empleado de Cobranza o Auditoría pierda su acceso.*")
+        st.markdown("*Use esta herramienta cuando pierda su acceso.*")
         if not df_usr.empty:
             with st.form("form_reset_password"):
                 email_a_resetear = st.selectbox("Seleccione el Usuario a Modificar:", options=df_usr["email"].tolist())
