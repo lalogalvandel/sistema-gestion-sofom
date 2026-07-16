@@ -14,7 +14,6 @@ from src.theme import (
 st.set_page_config(page_title="Scoring Actuarial y Admisión | SOFOM", layout="wide")
 
 # --- BLINDAJE INSTITUCIONAL RBAC ---
-# Nivel de acceso: COBRANZA (2), accesible para Operaciones de Crédito y Dirección General
 verificar_acceso("COBRANZA")
 # -----------------------------------
 
@@ -35,10 +34,6 @@ rol_actual = st.session_state.get("user_role", "COBRANZA")
 # -----------------------------------------------------------------------------
 @st.cache_resource
 def inicializar_motor_scoring():
-    """
-    Entrena y calibra un modelo de Regresión Logística utilizando una distribución
-    estadística base que refleja el comportamiento histórico de cartera en SOFOMs ENR.
-    """
     np.random.seed(108)
     n_muestras = 1000
     
@@ -70,25 +65,49 @@ def inicializar_motor_scoring():
 modelo_scoring, escalador_features = inicializar_motor_scoring()
 
 # -----------------------------------------------------------------------------
-# 2. BÓVEDA DIGITAL DE EXPEDIENTES Y VERIFICACIÓN LEGAL (KYC / PLD)
+# 2. BÓVEDA DIGITAL, ASISTENTE DE DECISIÓN SIC Y CONSENTIMIENTO
 # -----------------------------------------------------------------------------
-titulo_seccion("documento", "1. Bóveda Digital de Expediente y Consentimiento Legal")
+titulo_seccion("documento", "1. Bóveda Digital, Asistente de Decisión y Consentimiento Legal")
 
 st.markdown(f"**Funcionario Evaluador en Sesión:** `{usuario_actual}` ({rol_actual})")
 
-st.markdown("""
-**Protocolo Institucional de Auto-Consulta Asistida (Costo $0.00 MXN para la SOFOM):**
-En estricto apego al Artículo 40 de la Ley para Regular las Sociedades de Información Crediticia (LRSIC), el solicitante tiene derecho a obtener su Reporte de Crédito Especial (RCE) en formato PDF de forma gratuita una vez cada 12 meses. Para procesar la solicitud sin costo de investigación ni fricción operativa, el solicitante debe aportar su documento oficial descargado directamente desde las centrales de riesgo o, en su defecto, sus últimos 3 estados de cuenta bancarios para acreditación de flujo de caja.
+# -- ASISTENTE INTERACTIVO DE DECISIÓN SIC --
+st.markdown("**Matriz de Decisión Institucional: ¿Qué documento solicitar al cliente?**")
+perfil_cliente = st.selectbox(
+    "Seleccione el perfil financiero o laboral principal del solicitante:",
+    [
+        "A) Asalariado formal, profesionista o empresa con nómina en Bancos Tradicionales (BBVA, Banorte, Banamex, Santander, etc.)",
+        "B) Comerciante, trabajador independiente, o usuario de FinTechs (Nu, Mercado Pago), Tiendas Retail (Coppel, Elektra) y Microcréditos",
+        "C) Perfil mixto, economía informal o sin historial bancario identificable"
+    ]
+)
 
-* **Portal Oficial Buró de Crédito:** [www.burodecredito.com.mx](https://www.burodecredito.com.mx)
-* **Portal Oficial Círculo de Crédito:** [www.circulodecredito.com.mx](https://www.circulodecredito.com.mx)
-""")
+if perfil_cliente.startswith("A)"):
+    st.info("**Instrucción Institucional:** El perfil bancario tradicional concentra su historial en **BURÓ DE CRÉDITO**. Solicite al cliente que descargue su Reporte de Crédito Especial gratuito en el siguiente enlace oficial: [www.burodecredito.com.mx](https://www.burodecredito.com.mx)")
+elif perfil_cliente.startswith("B)"):
+    st.info("**Instrucción Institucional:** El ecosistema FinTech, comercial y microfinanciero reporta prioritariamente a **CÍRCULO DE CRÉDITO**. Solicite al cliente su reporte gratuito en el siguiente enlace oficial: [www.circulodecredito.com.mx](https://www.circulodecredito.com.mx)")
+else:
+    st.info("**Instrucción Institucional:** Para perfiles de la economía informal o sin historial bancario, **prescinda de la consulta crediticia** y solicite estrictamente los **Últimos 3 Estados de Cuenta Bancarios (PDF)** para evaluar liquidez real y flujo de caja.")
+
+# -- GUÍA DE LECTURA RÁPIDA (ACORDEÓN DESPLEGABLE) --
+with st.expander("Ayuda Operativa: Guía de Lectura Rápida de PDF (Traducción de Códigos MOP)"):
+    st.markdown("""
+    Al abrir el documento PDF del cliente, localice la sección de **Historial de Pagos** y busque la clave de comportamiento (**MOP** o semáforo). Utilice la siguiente tabla de conversión para llenar el formulario inferior:
+    
+    * **MOP 01 (Cuenta al corriente / Sin atrasos):** Asigne el valor **0** en el modelo.
+    * **MOP 02 (Atraso de 1 a 29 días):** Asigne el valor **1 (Atraso leve)** en el modelo.
+    * **MOP 03 (Atraso de 30 a 59 días):** Asigne el valor **2 (Atraso moderado)** en el modelo.
+    * **MOP 04, 05, 99 o Cuenta en Cobranza Judicial:** Asigne el valor **3 (Atraso severo / marca negativa)** en el modelo.
+    * *Si evalúa con Estados de Cuenta Bancarios y no hay sobregiros ni rebotes:* Asigne el valor **0**.
+    """)
+
+st.markdown("---")
 
 col_doc1, col_doc2 = st.columns([1, 1.2])
 
 with col_doc1:
-    st.markdown("**Carga de Expediente Digital (PDF obligatoria):**")
-    archivo_kyc = st.file_uploader("Adjuntar Reporte de Buró de Crédito o Estados de Cuenta (PDF):", type=["pdf"])
+    st.markdown("**Carga de Expediente Digital (PDF obligatorio):**")
+    archivo_kyc = st.file_uploader("Adjuntar Reporte Crediticio o Estados de Cuenta (PDF):", type=["pdf"])
 
 with col_doc2:
     st.markdown("**Validación Jurídica de Consentimiento (Innegociable):**")
@@ -139,14 +158,14 @@ with st.form("form_evaluacion_crediticia"):
     c_mora1, c_mora2 = st.columns([1, 2])
     with c_mora1:
         mora_buro = st.selectbox("Clasificación de Historial en Buró de Crédito (Acreditado en PDF):", [
-            (0, "0. Sin atrasos reportados en historial (0 días)"),
-            (1, "1. Atraso leve histórico (1 a 30 días)"),
-            (2, "2. Atraso moderado histórico (31 a 60 días)"),
-            (3, "3. Atraso severo o marca negativa (> 60 días)")
+            (0, "0. Sin atrasos reportados en historial (0 días - MOP 01)"),
+            (1, "1. Atraso leve histórico (1 a 30 días - MOP 02)"),
+            (2, "2. Atraso moderado histórico (31 a 60 días - MOP 03)"),
+            (3, "3. Atraso severo o marca negativa (> 60 días - MOP 04+)"),
         ], format_func=lambda x: x[1])[0]
     with c_mora2:
         st.markdown("<br>", unsafe_allow_html=True)
-        st.caption("Nota de Auditoría: El parámetro seleccionado en esta casilla debe coincidir de forma estricta con el comportamiento reflejado en el documento PDF adjuntado en la Sección 1.")
+        st.caption("Nota de Auditoría: El parámetro seleccionado en esta casilla debe coincidir de forma estricta con la clave MOP o comportamiento reflejado en el documento PDF adjuntado en la Sección 1.")
 
     st.markdown("<br>", unsafe_allow_html=True)
     ejecutar_evaluacion = st.form_submit_button("Ejecutar Motor de Inteligencia y Calcular Tasa", use_container_width=True)
@@ -155,7 +174,6 @@ with st.form("form_evaluacion_crediticia"):
 # 4. PROCESAMIENTO ALGORÍTMICO Y DICTAMEN DE RIESGO
 # -----------------------------------------------------------------------------
 if ejecutar_evaluacion:
-    # Candado de Seguridad Legal y Operativa
     if not archivo_kyc:
         st.error("BLOQUEO DE AUDITORÍA: No se puede ejecutar el modelo de scoring si no se ha adjuntado el expediente digital (PDF) en la Bóveda de Consentimiento.")
     elif not declaracion_legal:
