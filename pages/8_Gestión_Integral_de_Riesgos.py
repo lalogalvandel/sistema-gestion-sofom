@@ -166,26 +166,41 @@ st.divider()
 # -----------------------------------------------------------------------------
 titulo_seccion("documento", "3. Bitácora de Gestión Extrajudicial y Contenciosa")
 
+# Capturamos los datos del usuario logueado en la sesión
+usuario_actual = st.session_state.get("user_email", "Usuario No Identificado")
+rol_actual = st.session_state.get("user_role", "AUDITOR")
+es_auditor_solo_lectura = (rol_actual == "AUDITOR")
+
 col_bitacora, col_historial = st.columns([1, 1.5])
 
 with col_bitacora:
     st.markdown("**Registro Legal de Intervención:**")
+    
+    # Sello institucional de quién está operando el módulo
+    st.caption(f"🏛️ Gestor Responsable en Sesión: **{usuario_actual}** ({rol_actual})")
+    
+    if es_auditor_solo_lectura:
+        st.warning("⚠️ Su perfil institucional (AUDITOR) tiene permisos exclusivos de consulta y supervisión. No está habilitado para registrar intervenciones ni modificar expedientes en este módulo.")
+    
     with st.form("form_bitacora_cobranza"):
-        id_credito_ref = st.text_input("Folio o RFC del Crédito en Mora:", placeholder="Ej: RFC o Contrato #1024")
+        id_credito_ref = st.text_input("Folio o RFC del Crédito en Mora:", placeholder="Ej: RFC o Contrato #1024", disabled=es_auditor_solo_lectura)
         tipo_accion = st.selectbox("Clasificación del Acto Operativo:", [
             "Gestión Telefónica - Acuerdo de Pago",
             "Notificación Electrónica - Aviso de Vencimiento",
             "Carta Convenio - Reestructura de Adeudo",
             "Turnado a Despacho Externo - Proceso Contencioso",
             "Inspección Presencial - Verificación de Domicilio"
-        ])
-        fecha_promesa = st.date_input("Fecha Límite Compromiso:")
-        notas_gestion = st.text_area("Declaraciones y Extracto de la Gestión:", placeholder="El acreditado manifiesta retraso por insolvencia temporal. Suscribe compromiso de liquidación parcial en la fecha estipulada.")
+        ], disabled=es_auditor_solo_lectura)
+        
+        fecha_promesa = st.date_input("Fecha Límite Compromiso:", disabled=es_auditor_solo_lectura)
+        notas_gestion = st.text_area("Declaraciones y Extracto de la Gestión:", placeholder="El acreditado manifiesta retraso por insolvencia temporal. Suscribe compromiso de liquidación parcial en la fecha estipulada.", disabled=es_auditor_solo_lectura)
         
         st.markdown("<br>", unsafe_allow_html=True)
-        guardar_bitacora = st.form_submit_button("Anexar Gestión al Expediente", use_container_width=True)
         
-        if guardar_bitacora:
+        # El botón se bloquea si el usuario es solo Auditor
+        guardar_bitacora = st.form_submit_button("Anexar Gestión al Expediente", use_container_width=True, disabled=es_auditor_solo_lectura)
+        
+        if guardar_bitacora and not es_auditor_solo_lectura:
             if not id_credito_ref or not notas_gestion:
                 st.warning("Los campos de referencia del crédito y extracto de gestión son obligatorios para el registro legal.")
             else:
@@ -197,7 +212,7 @@ with col_bitacora:
                             "fecha_compromiso": str(fecha_promesa),
                             "notas": notas_gestion.strip(),
                             "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "usuario_gestor": st.session_state.get("user_email", "Sistema Institucional")
+                            "usuario_gestor": usuario_actual
                         }
                         supabase.table("bitacora_cobranza").insert(payload_bitacora).execute()
                         dictamen("exito", "Intervención Registrada", "El acto de cobranza ha sido debidamente anexado a la pista de auditoría del cliente.")
@@ -210,7 +225,10 @@ with col_historial:
         res_bit = supabase.table("bitacora_cobranza").select("*").order("fecha_registro", desc=True).limit(10).execute()
         if res_bit.data:
             df_bit = pd.DataFrame(res_bit.data)
-            st.dataframe(df_bit[["fecha_registro", "id_credito_ref", "tipo_accion", "fecha_compromiso"]], use_container_width=True)
+            # Renombramos columnas para presentarlas de manera ejecutiva
+            df_bit_presentacion = df_bit[["fecha_registro", "id_credito_ref", "tipo_accion", "usuario_gestor"]].copy()
+            df_bit_presentacion.columns = ["Fecha UTC", "Referencia", "Intervención", "Gestor Firmante"]
+            st.dataframe(df_bit_presentacion, use_container_width=True)
         else:
             st.info("No existen registros de intervención extrajudicial en el historial reciente.")
     except Exception:
