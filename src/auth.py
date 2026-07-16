@@ -5,9 +5,9 @@ def verificar_acceso(rol_requerido):
     Verifica que exista una sesión activa y que el usuario tenga
     el nivel de privilegios necesario. Si falla, detiene la ejecución.
     """
-    # 1. Validar sesión activa
+    # 1. Validar sesión activa (AQUÍ ESTÁ EL CAMBIO DE RUTA )
     if "logged_in" not in st.session_state or not st.session_state["logged_in"]:
-        st.switch_page("login.py")
+        st.switch_page("pages/0_Login.py")
         
     # 2. Jerarquía institucional de accesos
     jerarquia = {
