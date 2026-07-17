@@ -21,29 +21,28 @@ encabezado_modulo(
     insignia="SISTEMA FRANCÉS"
 )
 
+@st.cache_data(ttl=15)
 def obtener_clientes_aprobados():
     try:
-        # Solo leemos los que están listos para calcular calendario
-        res = supabase.table("prestamos").select("*").eq("estatus", "APROBADO").execute()
-        return res.data if res.data else []
-    except Exception:
-        return []
+        # 1. SOLO leemos de la tabla 'prestamos' los créditos que el Módulo 1 acaba de dejar como APROBADO
+        res = supabase.table("prestamos").select("*").in_("estatus", ["APROBADO", "APROBADO PREFERENCIAL", "APROBADO CONDICIONADO"]).order("fecha_otorgamiento", desc=True).execute()
+        
+        if not res.data:
+            return []
             
-        # 2. Mapeamos las columnas de 'prestamos' al formato que espera este módulo de amortización
+        # 2. Mapeamos las columnas exactas para que el selector no falle
         clientes_formateados = []
         for p in res.data:
             clientes_formateados.append({
                 "id_cliente": p.get("id_cliente") or p.get("rfc") or p.get("id_prestamo", "SIN-ID"),
                 "nombre_completo": p.get("cliente", "Deudor sin nombre"),
                 "rfc": p.get("rfc", "XAXX010101000"),
-                "estatus_admision": p.get("estatus", "ACTIVO"),
-                # Extraemos también el monto y la tasa para que el formulario se llene solo:
+                "estatus_admision": p.get("estatus", "APROBADO"),
                 "monto_aprobado": p.get("monto", p.get("saldo_pendiente", 15000.0)),
                 "tasa_mensual": p.get("tasa_mensual", 6.0)
             })
         return clientes_formateados
     except Exception as e:
-        # Si algo falla en la red, devolvemos lista vacía sin romper la pantalla
         return []
 
 clientes_db = obtener_clientes_aprobados()
@@ -192,35 +191,54 @@ st.divider()
 
 titulo_seccion("documento", "3. Calendario Detallado de Obligaciones (Anexo al Contrato)")
 
+titulo_seccion("documento", "3. Calendario Detallado y Paso a Jurídico")
+
 if "credito_calculado" in st.session_state and st.session_state["credito_calculado"]:
     df_mostrar = st.session_state["credito_calculado"]["tabla_df"]
-    st.dataframe(df_mostrar, use_container_width=True)
+    st.dataframe(df_mostrar, width="stretch")
     
-    col_acc1, col_acc2 = st.columns([1, 1])
+    col_acc1, col_acc2 = st.columns([1, 1.2])
     with col_acc1:
         csv_export = df_mostrar.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="Descargar Anexo Contable (CSV)",
+            label="📥 Descargar Anexo Contable (CSV)",
             data=csv_export,
             file_name="tabla_amortizacion_legal.csv",
             mime="text/csv",
-            use_container_width=True
+            width="stretch"
         )
     with col_acc2:
+        # BOTÓN INSTITUCIONAL CORRECTO: No formaliza, solo guarda el calendario y avanza el estatus
         if st.button("Guardar Calendario y Turnar a Jurídico", type="primary", width="stretch"):
-            with st.spinner("Inscribiendo tabla de amortización en el servidor..."):
+            with st.spinner("Inscribiendo tabla de amortización en el servidor y turnando expediente..."):
+                datos_c = st.session_state["credito_calculado"]
                 try:
-                    id_target = st.session_state["credito_calculado"]["id_cliente"]
+                    target_id = str(datos_c["id_cliente"]).strip()
                     
-                    # Actualizamos el registro con el cálculo contable exacto y cambiamos estatus
-                    supabase.table("prestamos").update({
-                        "cuota_fija_proyectada": st.session_state["credito_calculado"]["cuota_fija_proyectada"],
-                        "monto_total_recaudar": st.session_state["credito_calculado"]["monto_total_recaudar"],
-                        "estatus": "ESTRUCTURADO"  # <--- AVANZA AL PASO 2
-                    }).eq("rfc", id_target).execute() # o por id_prestamo si lo tienes
+                    payload_actualizacion = {
+                        "plazo_meses": int(datos_c["plazo_quincenas"]),
+                        "cuota_fija_proyectada": float(datos_c["cuota_fija_proyectada"]),
+                        "monto_total_recaudar": float(datos_c["monto_total_recaudar"]),
+                        "fecha_desembolso": datos_c["fecha_desembolso"],
+                        "estatus": "ESTRUCTURADO"  # <--- LA CLAVE: Avanza al paso 2 del pipeline
+                    }
                     
-                    dictamen("exito", "Estructuración Contable Completa", "El calendario se ha enlazado al expediente. El cliente está listo en la Mesa Jurídica para la emisión de su Pagaré.")
+                    # 1. Intentamos actualizar buscando por RFC (que es el ID que viene del Módulo 1)
+                    res_upd = supabase.table("prestamos").update(payload_actualizacion).eq("rfc", target_id).execute()
+                    
+                    # 2. Si por algo no hizo match con rfc, intentamos buscando por id_cliente o por cliente
+                    if not res_upd.data:
+                        res_upd = supabase.table("prestamos").update(payload_actualizacion).eq("id_cliente", target_id).execute()
+                    if not res_upd.data:
+                        res_upd = supabase.table("prestamos").update(payload_actualizacion).eq("cliente", target_id).execute()
+                    
+                    dictamen("exito", "Estructuración Contable Completa", "El calendario bajo Sistema Francés se ha enlazado al expediente del cliente. El estatus del crédito ha cambiado oficialmente a **ESTRUCTURADO**.")
+                    st.info("**Siguiente paso del pipeline:** Ve a la pestaña **4. Contratos y Legal**. El acreditado ya te espera en la lista jurídica para emitir su Pagaré Mercantil y firmar el contrato.")
+                    
+                    # Limpiamos la memoria de la calculadora para el siguiente expediente
+                    del st.session_state["credito_calculado"]
+                    
                 except Exception as e:
-                    dictamen("peligro", "Error en Estructuración", f"Detalle técnico: {str(e)}")
+                    dictamen("peligro", "Error en Transacción", f"No se pudo completar la actualización contable en el servidor: {str(e)}")
 else:
     st.info("Configure los parámetros y presione el botón de cálculo para visualizar el calendario formal.")
