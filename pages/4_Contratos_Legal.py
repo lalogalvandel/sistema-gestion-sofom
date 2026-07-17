@@ -88,12 +88,15 @@ def calcular_cat_banxico(monto_prestado, plazo_periodos, tasa_mensual_pct, comis
 # -----------------------------------------------------------------------------
 titulo_seccion("documento", "1. Selección de Crédito y Expediente por Formalizar")
 
-@st.cache_data(ttl=20)
+@st.cache_data(ttl=15)
 def obtener_creditos_candidatos():
     try:
-        # Solo aparecen los que ya fueron aprobados y tienen calendario calculado
-        res = supabase.table("prestamos").select("*").eq("estatus", "ESTRUCTURADO").execute()
-        return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+        # 1. Leemos los créditos listos para firma legal (priorizando ESTRUCTURADO)
+        res = supabase.table("prestamos").select("*").in_("estatus", ["ESTRUCTURADO", "APROBADO", "APROBADO PREFERENCIAL", "APROBADO CONDICIONADO"]).order("fecha_otorgamiento", desc=True).execute()
+        if not res.data:
+            return pd.DataFrame()
+        df = pd.DataFrame(res.data)
+        return df
     except Exception:
         return pd.DataFrame()
 
@@ -299,29 +302,43 @@ def generar_pdf_instrumento_legal():
     return bytes(pdf.output())
 
 # -----------------------------------------------------------------------------
-# 5. EMISIÓN Y DESCARGA DEL INSTRUMENTO
+# 5. FORMALIZACIÓN SUPREMA Y EMISIÓN DE TÍTULO EJECUTIVO
 # -----------------------------------------------------------------------------
-titulo_seccion("documento_check", "4. Emisión y Descarga del Expediente Legal")
+titulo_seccion("documento_check", "4. Formalización Definitiva y Emisión del Instrumento")
 
-st.markdown("Al descargar este documento, se compilará el contrato de crédito junto con el título ejecutivo del Pagaré. La institución conserva el respaldo numérico en la base de datos para auditorías de cartera.")
+st.markdown("Al presionar este botón, el sistema compilará el **Contrato de Adhesión RECA** junto con el **Pagaré Ejecutivo Mercantil**. Simultáneamente, el servidor registrará la firma del instrumento y moverá el crédito al estatus **VIGENTE** en la cartera viva.")
 
 col_btn1, col_btn2 = st.columns([1, 2])
 with col_btn1:
-    btn_generar = st.button("Compilar Expediente en PDF", type="primary", use_container_width=True)
+    # EL BOTÓN DEFINITIVO: Formaliza en BD y emite el título de crédito
+    btn_generar = st.button("Formalizar Crédito, Emitir Pagaré y Desembolsar", type="primary", width="stretch")
 
 if btn_generar:
-    with st.spinner("Compilando contrato RECA y Pagaré Mercantil..."):
+    with st.spinner("Compilando cláusulas mercantiles e inscribiendo crédito en Cartera Viva..."):
         try:
+            # A) Fabricamos el PDF del Contrato y Pagaré Mercantil
             pdf_bytes = generar_pdf_instrumento_legal()
             
-            # ACTIVACIÓN JURÍDICA: Cambiamos el estatus a VIGENTE (Cartera Viva)
-            supabase.table("prestamos").update({
-                "estatus": "VIGENTE",  # <--- AQUÍ NACE EL CRÉDITO Y LA OBLIGACIÓN DE COBRO
-                "fecha_formalizacion": datetime.now().strftime("%Y-%m-%d")
-            }).eq("rfc", rfc_cliente_op).execute()
+            # B) LA ACTIVACIÓN JURÍDICA: Cambiamos el estatus a VIGENTE en el servidor
+            target_id = str(rfc_cliente_op).strip()
+            payload_formalizacion = {
+                "estatus": "VIGENTE", # <--- LA CORONA: El crédito nace legalmente aquí
+                "fecha_otorgamiento": datetime.now().strftime("%Y-%m-%d")
+            }
             
-            st.success("¡Crédito Formalizado y Desembolsado con Éxito! El Pagaré tiene fuerza ejecutiva y el expediente pasó a Cobranza.")
+            # Intentamos actualizar por RFC o por Nombre del Cliente
+            res_upd = supabase.table("prestamos").update(payload_formalizacion).eq("rfc", target_id).in_("estatus", ["ESTRUCTURADO", "APROBADO", "APROBADO PREFERENCIAL", "APROBADO CONDICIONADO"]).execute()
+            if not res_upd.data:
+                res_upd = supabase.table("prestamos").update(payload_formalizacion).eq("cliente", nombre_cliente_op).in_("estatus", ["ESTRUCTURADO", "APROBADO", "APROBADO PREFERENCIAL", "APROBADO CONDICIONADO"]).execute()
             
+            # Registro en bitácora local de emisión
+            st.session_state["ultimo_reca_emitido"] = f"RECA-{rfc_cliente_op}-{datetime.now().strftime('%m%d%H%M')}"
+            
+            # C) MENSAJE DE TRIUNFO INSTITUCIONAL
+            st.success(f"¡CRÉDITO FORMALIZADO CON ÉXITO! El acreditado **{nombre_cliente_op}** es ahora un deudor activo en la cartera viva (**VIGENTE**).")
+            st.info("**Siguiente paso del ciclo operativo:** El expediente ha pasado a manos de la Mesa de Cobranza para el seguimiento de sus cuotas quincenales.")
+            
+            # D) Habilitamos la descarga inmediata del Pagaré
             st.download_button(
                 label="📥 Descargar Contrato y Pagaré Mercantil (PDF)",
                 data=pdf_bytes,
@@ -330,4 +347,4 @@ if btn_generar:
                 width="stretch"
             )
         except Exception as e:
-            st.error(f"Error en formalización legal: {str(e)}")
+            st.error(f"Error técnico durante la formalización contractual: {str(e)}")
