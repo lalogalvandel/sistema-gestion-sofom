@@ -264,9 +264,10 @@ if ejecutar_evaluacion:
                 btn_guardar_prestamo = st.button("Formalizar y Enviar a Cartera Viva", use_container_width=True, type="primary")
             
             if btn_guardar_prestamo:
-                with st.spinner("Procesando formalización e inscribiendo crédito en el servidor..."):
-                    # 1. INTENTO DE SUBIDA DE ARCHIVO A STORAGE (INDEPENDIENTE)
-                    ruta_guardada = "Archivo no adjuntado o pendiente"
+                with st.spinner("Subiendo expediente a bóveda e inscribiendo crédito..."):
+                    
+                    # A) Intentar subir PDF al bucket 'expedientes'
+                    info_doc = "Sin documento adjunto"
                     if archivo_kyc is not None:
                         try:
                             nombre_archivo_storage = f"kyc/{rfc_cliente.strip()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
@@ -275,45 +276,41 @@ if ejecutar_evaluacion:
                             supabase.storage.from_("expedientes").upload(
                                 path=nombre_archivo_storage,
                                 file=file_bytes,
-                                file_options={"content-type": "application/pdf"}
+                                file_options={"content-type": "application/pdf", "upsert": "true"}
                             )
-                            ruta_guardada = f"Doc: {nombre_archivo_storage}"
+                            info_doc = f"Storage: {nombre_archivo_storage}"
+                            st.toast("Expediente PDF guardado en la nube.", icon="📁")
                         except Exception as e_storage:
-                            # Si falla el storage, avisamos pero NO detenemos el registro del crédito
-                            st.warning(f"Aviso de Storage: El PDF no se pudo subir a la nube ({str(e_storage)}), pero continuaremos con el registro contable.")
-                            ruta_guardada = f"Doc: Local ({archivo_kyc.name}) - Sin nube"
+                            st.warning(f"Aviso de nube: El PDF no se pudo subir ({str(e_storage)}), pero el préstamo SÍ se registrará.")
+                            info_doc = f"Local: {archivo_kyc.name}"
 
-                    # 2. INTENTO DE REGISTRO EN LA BASE DE DATOS SQL (LO QUE HABILITA PAGARÉS Y AMORTIZACIÓN)
+                    # B) Guardar el crédito en la tabla SQL (ESTO ACTIVA LOS CONTRATOS)
                     try:
                         fecha_corte_actual = datetime.now()
                         dias_periodo = 15 if frecuencia_pago == "Quincenal" else 30
                         fecha_primer_vencimiento = fecha_corte_actual + timedelta(days=dias_periodo)
                         
                         payload_prestamo = {
-                            "cliente": nombre_cliente.strip(),
-                            "rfc": rfc_cliente.strip(),
+                            "cliente": str(nombre_cliente).strip(),
+                            "rfc": str(rfc_cliente).strip(),
                             "monto": float(monto_solicitado),
                             "saldo_pendiente": float(monto_solicitado),
                             "plazo_meses": int(plazo_meses),
-                            "frecuencia": frecuencia_pago,
+                            "frecuencia": str(frecuencia_pago),
                             "tasa_mensual": float(tasa_mensual_asignada),
                             "tasa_anual": float(tasa_anual_asignada),
                             "score_asignado": int(score_crediticio),
                             "probabilidad_default": round(float(prob_default), 4),
                             "estatus": "ACTIVO",
                             "fecha_otorgamiento": fecha_corte_actual.strftime("%Y-%m-%d"),
-                            "proximo_vencimiento": fecha_primer_vencimiento.strftime("%Y-%m-%d")
+                            "proximo_vencimiento": fecha_primer_vencimiento.strftime("%Y-%m-%d"),
+                            "gestor_originador": f"{usuario_actual} | {info_doc}"
                         }
                         
-                        # Agregamos gestor solo si no va a romper tu esquema (intentamos enviarlo)
-                        payload_prestamo["gestor_originador"] = f"{usuario_actual} | {ruta_guardada}"
+                        supabase.table("prestamos").insert(payload_prestamo).execute()
                         
-                        # Ejecutamos inserción
-                        res_sql = supabase.table("prestamos").insert(payload_prestamo).execute()
-                        
-                        st.success(f"¡Crédito Formalizado con Éxito! El acreditado **{nombre_cliente.strip()}** ha sido registrado en el servidor.")
-                        st.info("**Siguiente paso:** Ve al módulo **4. Contratos y Legal** en el menú izquierdo. Verás a este cliente disponible en la lista para generar su Pagaré y su CAT Oficial.")
+                        st.success(f"¡Crédito Formalizado con Éxito! El cliente **{nombre_cliente.strip()}** ya está guardado en el servidor.")
+                        st.info("**Siguiente paso:** Ve a la pestaña **4. Contratos y Legal**, selecciónalo en la lista y descarga su Pagaré.")
                         
                     except Exception as e_sql:
-                        # Si esto falla, es 100% por una columna faltante en Supabase o un RLS en la tabla prestamos
-                        dictamen("peligro", "Error SQL al registrar crédito", f"El servidor rechazó el guardado del préstamo. Motivo exacto de la base de datos: {str(e_sql)}")
+                        dictamen("peligro", "Error de Base de Datos", f"El servidor rechazó el guardado. Detalle técnico: {str(e_sql)}")
