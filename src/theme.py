@@ -1,4 +1,5 @@
 import streamlit as st
+import re
 
 # =============================================================================
 # 1. PALETA DE COLORES INSTITUCIONAL
@@ -287,15 +288,23 @@ def tarjeta_protocolo(titulo, items, nombre_icono=None):
 import re # Asegúrate de importar re al inicio del archivo
 
 def dictamen(estatus, titulo_txt, texto_txt):
+    # Validaciones de seguridad
+    if texto_txt is None:
+        texto_txt = "Error: Sin mensaje de dictamen disponible."
+    if titulo_txt is None:
+        titulo_txt = "Aviso"
+        
     icon_map = {"exito": "verificado", "alerta": "alerta_triangulo", "peligro": "cancelado"}
     color_map = {"exito": PALETA["exito"], "alerta": PALETA["alerta"], "peligro": PALETA["peligro"]}
     
-    # Limpieza: Convierte **texto** a <strong>texto</strong> para que HTML lo interprete
-    texto_procesado = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', texto_txt)
+    # Limpieza: Convertir **texto** a <strong>texto</strong>
+    # Nos aseguramos de que sea string antes de hacer el sub
+    texto_seguro = str(texto_txt)
+    texto_procesado = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', texto_seguro)
     
     st.markdown(f"""
     <div class="sofom-dictamen {estatus}">
-        {icono(icon_map[estatus], color=color_map[estatus], size=24)}
+        {icono(icon_map.get(estatus, 'alerta_triangulo'), color=color_map.get(estatus, '#000'), size=24)}
         <div>
             <div class="sofom-dictamen-titulo">{titulo_txt}</div>
             <div class="sofom-dictamen-texto">{texto_procesado}</div>
