@@ -308,10 +308,10 @@ if ejecutar_evaluacion:
                         }
                         
                         # IMPORTANTE: Imprimimos el resultado para ver qué pasa
-                    resultado = supabase.table("prestamos").insert(payload_prestamo).execute()
-                    st.success("¡Crédito registrado!")
-                    
-                except Exception as e:
-                    # ESTO TE VA A DECIR LA VERDAD DEL PORQUÉ NO GUARDA
-                    st.error(f"ERROR TÉCNICO EN EL SERVIDOR: {str(e)}")
-                    st.write(payload_prestamo) # Debugging para ver qué intenta mandar
+                        resultado = supabase.table("prestamos").insert(payload_prestamo).execute()
+                        st.success("¡Crédito registrado!")
+                        
+                    except Exception as e:
+                        # ESTO TE VA A DECIR LA VERDAD DEL PORQUÉ NO GUARDA
+                        st.error(f"ERROR TÉCNICO EN EL SERVIDOR: {str(e)}")
+                        st.write(payload_prestamo) # Debugging para ver qué intenta mandar
