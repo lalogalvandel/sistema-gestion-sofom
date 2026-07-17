@@ -307,10 +307,11 @@ if ejecutar_evaluacion:
                             "gestor_originador": f"{usuario_actual} | {info_doc}"
                         }
                         
-                        supabase.table("prestamos").insert(payload_prestamo).execute()
-                        
-                        st.success(f"¡Crédito Formalizado con Éxito! El cliente **{nombre_cliente.strip()}** ya está guardado en el servidor.")
-                        st.info("**Siguiente paso:** Ve a la pestaña **4. Contratos y Legal**, selecciónalo en la lista y descarga su Pagaré.")
-                        
-                    except Exception as e_sql:
-                        dictamen("peligro", "Error de Base de Datos", f"El servidor rechazó el guardado. Detalle técnico: {str(e_sql)}")
+                        # IMPORTANTE: Imprimimos el resultado para ver qué pasa
+                    resultado = supabase.table("prestamos").insert(payload_prestamo).execute()
+                    st.success("¡Crédito registrado!")
+                    
+                except Exception as e:
+                    # ESTO TE VA A DECIR LA VERDAD DEL PORQUÉ NO GUARDA
+                    st.error(f"ERROR TÉCNICO EN EL SERVIDOR: {str(e)}")
+                    st.write(payload_prestamo) # Debugging para ver qué intenta mandar
