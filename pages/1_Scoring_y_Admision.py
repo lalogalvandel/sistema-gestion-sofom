@@ -171,7 +171,7 @@ with st.form("form_evaluacion_crediticia"):
     ejecutar_evaluacion = st.form_submit_button("Ejecutar Motor de Inteligencia y Calcular Tasa", use_container_width=True)
 
 # -----------------------------------------------------------------------------
-# 4. PROCESAMIENTO ALGORÍTMICO Y DICTAMEN DE RIESGO
+# 4. PROCESAMIENTO ALGORÍTMICO Y DICTAMEN DE RIESGO (CON MEMORIA DE SESIÓN)
 # -----------------------------------------------------------------------------
 if ejecutar_evaluacion:
     if not archivo_kyc:
@@ -194,7 +194,6 @@ if ejecutar_evaluacion:
         })
         
         vector_escalado = escalador_features.transform(vector_cliente)
-        
         prob_default = float(modelo_scoring.predict_proba(vector_escalado)[:, 1][0])
         
         score_crediticio = int(850 - (prob_default * 550))
@@ -228,90 +227,112 @@ if ejecutar_evaluacion:
             tasa_mensual_asignada = round(tasa_anual_asignada / 12.0, 2)
             estatus_dictamen = "APROBADO PREFERENCIAL" if score_crediticio >= 700 else "APROBADO CONDICIONADO"
 
-        st.divider()
-        titulo_seccion("estadisticas", "3. Dictamen del Comité Algorítmico y Pricing")
-        
-        k1, k2, k3, k4 = st.columns(4)
-        with k1:
-            tarjeta_kpi("Score Crediticio", f"{score_crediticio} pts", calificacion_grado)
-        with k2:
-            nivel_pd = "BAJO RIESGO" if prob_default < 0.06 else ("MODERADO" if prob_default < 0.12 else "ALTO RIESGO")
-            tarjeta_kpi("Probabilidad de Default (Pd)", f"{prob_default*100:.2f}%", f"Nivel: {nivel_pd}")
-        with k3:
-            tarjeta_kpi("Ratio Cobertura Deuda", f"{ratio_cobertura_calc}x", "Mínimo exigido: 1.20x")
-        with k4:
-            if estatus_dictamen == "RECHAZADO":
-                tarjeta_kpi("Tasa Mensual Sugerida", "N/A", "Operación Inviable")
-            else:
-                tarjeta_kpi("Tasa de Indiferencia", f"{tasa_mensual_asignada}% mensual", f"{tasa_anual_asignada}% anualizada")
+        # GUARDAMOS TODO EN LA MEMORIA DEL NAVEGADOR PARA QUE NO SE BORRE AL PICAR FORMALIZAR
+        st.session_state["dictamen_evaluado"] = {
+            "nombre_cliente": nombre_cliente,
+            "rfc_cliente": rfc_cliente,
+            "monto_solicitado": monto_solicitado,
+            "plazo_meses": plazo_meses,
+            "frecuencia_pago": frecuencia_pago,
+            "score_crediticio": score_crediticio,
+            "prob_default": prob_default,
+            "ratio_cobertura_calc": ratio_cobertura_calc,
+            "tasa_mensual_asignada": tasa_mensual_asignada,
+            "tasa_anual_asignada": tasa_anual_asignada,
+            "estatus_dictamen": estatus_dictamen,
+            "calificacion_grado": calificacion_grado
+        }
+
+# --- SECCIÓN DESACOPLADA: Se renderiza siempre que haya una evaluación en memoria ---
+if "dictamen_evaluado" in st.session_state:
+    datos = st.session_state["dictamen_evaluado"]
+    
+    st.divider()
+    titulo_seccion("estadisticas", "3. Dictamen del Comité Algorítmico y Pricing")
+    
+    k1, k2, k3, k4 = st.columns(4)
+    with k1:
+        tarjeta_kpi("Score Crediticio", f"{datos['score_crediticio']} pts", datos['calificacion_grado'])
+    with k2:
+        nivel_pd = "BAJO RIESGO" if datos['prob_default'] < 0.06 else ("MODERADO" if datos['prob_default'] < 0.12 else "ALTO RIESGO")
+        tarjeta_kpi("Probabilidad de Default (Pd)", f"{datos['prob_default']*100:.2f}%", f"Nivel: {nivel_pd}")
+    with k3:
+        tarjeta_kpi("Ratio Cobertura Deuda", f"{datos['ratio_cobertura_calc']}x", "Mínimo exigido: 1.20x")
+    with k4:
+        if datos['estatus_dictamen'] == "RECHAZADO":
+            tarjeta_kpi("Tasa Mensual Sugerida", "N/A", "Operación Inviable")
+        else:
+            tarjeta_kpi("Tasa de Indiferencia", f"{datos['tasa_mensual_asignada']}% mensual", f"{datos['tasa_anual_asignada']}% anualizada")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    nombre_arch = archivo_kyc.name if archivo_kyc else "Archivo temporal"
+    if datos['estatus_dictamen'] == "RECHAZADO":
+        dictamen("peligro", "Dictamen: SOLICITUD RECHAZADA POR RIESGO ACTUARIAL", 
+                 f"El modelo algorítmico determina una Probabilidad de Incumplimiento del **{datos['prob_default']*100:.2f}%** (Score: **{datos['score_crediticio']}**). La relación de cobertura de deuda de **{datos['ratio_cobertura_calc']}x** y el nivel de apalancamiento no cumplen con los parámetros del umbral de solvencia. Autorizar esta colocación generaría un valor patrimonial negativo para el fondo.")
+    else:
+        dictamen("exito", f"Dictamen: SOLICITUD {datos['estatus_dictamen']}", 
+                 f"El perfil evaluado acredita solvencia técnica con un Score de **{datos['score_crediticio']}** y una Probabilidad de Incumplimiento de **{datos['prob_default']*100:.2f}%**. Para garantizar la rentabilidad operativa del 20% y el rendimiento del capital social, la **Tasa de Indiferencia asignada es de {datos['tasa_mensual_asignada']}% mensual** ({datos['tasa_anual_asignada']}% anual). Documento KYC auditable: {nombre_arch}.")
 
         st.markdown("<br>", unsafe_allow_html=True)
+        titulo_seccion("documento_check", "4. Formalización y Alta en Cartera de Préstamos")
+        st.markdown("Al confirmar la colocación, el sistema registrará el crédito en el servidor y habilitará la emisión de pagarés y tablas de amortización con la tasa actuarial asignada.")
         
-        if estatus_dictamen == "RECHAZADO":
-            dictamen("peligro", "Dictamen: SOLICITUD RECHAZADA POR RIESGO ACTUARIAL", 
-                     f"El modelo algorítmico determina una Probabilidad de Incumplimiento del **{prob_default*100:.2f}%** (Score: **{score_crediticio}**). La relación de cobertura de deuda de **{ratio_cobertura_calc}x** y el nivel de apalancamiento no cumplen con los parámetros del umbral de solvencia. Autorizar esta colocación generaría un valor patrimonial negativo para el fondo.")
-        else:
-            dictamen("exito", f"Dictamen: SOLICITUD {estatus_dictamen}", 
-                     f"El perfil evaluado acredita solvencia técnica con un Score de **{score_crediticio}** y una Probabilidad de Incumplimiento de **{prob_default*100:.2f}%**. Para garantizar la rentabilidad operativa del 20% y el rendimiento del capital social, la **Tasa de Indiferencia asignada es de {tasa_mensual_asignada}% mensual** ({tasa_anual_asignada}% anual). Documento KYC auditable: {archivo_kyc.name}.")
-
-            st.markdown("<br>", unsafe_allow_html=True)
-            titulo_seccion("documento_check", "4. Formalización y Alta en Cartera de Préstamos")
-            
-            st.markdown("Al confirmar la colocación, el sistema registrará el crédito en el servidor y habilitará la emisión de pagarés y tablas de amortización con la tasa actuarial asignada.")
-            
-            col_conf1, col_conf2 = st.columns([1, 2])
-            with col_conf1:
-                btn_guardar_prestamo = st.button("Formalizar y Enviar a Cartera Viva", use_container_width=True, type="primary")
-            
-            if btn_guardar_prestamo:
-                with st.spinner("Subiendo expediente a bóveda e inscribiendo crédito..."):
-                    
-                    # A) Intentar subir PDF al bucket 'expedientes'
-                    info_doc = "Sin documento adjunto"
-                    if archivo_kyc is not None:
-                        try:
-                            nombre_archivo_storage = f"kyc/{rfc_cliente.strip()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-                            file_bytes = archivo_kyc.getvalue()
-                            
-                            supabase.storage.from_("expedientes").upload(
-                                path=nombre_archivo_storage,
-                                file=file_bytes,
-                                file_options={"content-type": "application/pdf", "upsert": "true"}
-                            )
-                            info_doc = f"Storage: {nombre_archivo_storage}"
-                            st.toast("Expediente PDF guardado en la nube.", icon="📁")
-                        except Exception as e_storage:
-                            st.warning(f"Aviso de nube: El PDF no se pudo subir ({str(e_storage)}), pero el préstamo SÍ se registrará.")
-                            info_doc = f"Local: {archivo_kyc.name}"
-
-                    # B) Guardar el crédito en la tabla SQL (ESTO ACTIVA LOS CONTRATOS)
+        col_conf1, col_conf2 = st.columns([1, 2])
+        with col_conf1:
+            # Al estar fuera del form y usando memoria, este botón SÍ responderá al clic
+            btn_guardar_prestamo = st.button("Formalizar y Enviar a Cartera Viva", width="stretch", type="primary")
+        
+        if btn_guardar_prestamo:
+            with st.spinner("Subiendo expediente a bóveda e inscribiendo crédito..."):
+                info_doc = "Sin documento adjunto"
+                if archivo_kyc is not None:
                     try:
-                        fecha_corte_actual = datetime.now()
-                        dias_periodo = 15 if frecuencia_pago == "Quincenal" else 30
-                        fecha_primer_vencimiento = fecha_corte_actual + timedelta(days=dias_periodo)
-                        
-                        payload_prestamo = {
-                            "cliente": str(nombre_cliente).strip(),
-                            "rfc": str(rfc_cliente).strip(),
-                            "monto": float(monto_solicitado),
-                            "saldo_pendiente": float(monto_solicitado),
-                            "plazo_meses": int(plazo_meses),
-                            "frecuencia": str(frecuencia_pago),
-                            "tasa_mensual": float(tasa_mensual_asignada),
-                            "tasa_anual": float(tasa_anual_asignada),
-                            "score_asignado": int(score_crediticio),
-                            "probabilidad_default": round(float(prob_default), 4),
-                            "estatus": "ACTIVO",
-                            "fecha_otorgamiento": fecha_corte_actual.strftime("%Y-%m-%d"),
-                            "proximo_vencimiento": fecha_primer_vencimiento.strftime("%Y-%m-%d"),
-                            "gestor_originador": f"{usuario_actual} | {info_doc}"
-                        }
-                        
-                        # IMPORTANTE: Imprimimos el resultado para ver qué pasa
-                        resultado = supabase.table("prestamos").insert(payload_prestamo).execute()
-                        st.success("¡Crédito registrado!")
-                        
-                    except Exception as e:
-                        # ESTO TE VA A DECIR LA VERDAD DEL PORQUÉ NO GUARDA
-                        st.error(f"ERROR TÉCNICO EN EL SERVIDOR: {str(e)}")
-                        st.write(payload_prestamo) # Debugging para ver qué intenta mandar
+                        nombre_archivo_storage = f"kyc/{datos['rfc_cliente']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                        file_bytes = archivo_kyc.getvalue()
+                        supabase.storage.from_("expedientes").upload(
+                            path=nombre_archivo_storage,
+                            file=file_bytes,
+                            file_options={"content-type": "application/pdf", "upsert": "true"}
+                        )
+                        info_doc = f"Storage: {nombre_archivo_storage}"
+                        st.toast("Expediente PDF guardado en la nube.", icon="📁")
+                    except Exception as e_storage:
+                        st.warning(f"Aviso de nube: El PDF no se pudo subir ({str(e_storage)}), pero el préstamo SÍ se registrará.")
+                        info_doc = f"Local: {archivo_kyc.name}"
+
+                try:
+                    fecha_corte_actual = datetime.now()
+                    dias_periodo = 15 if datos['frecuencia_pago'] == "Quincenal" else 30
+                    fecha_primer_vencimiento = fecha_corte_actual + timedelta(days=dias_periodo)
+                    
+                    payload_prestamo = {
+                        "cliente": str(datos['nombre_cliente']).strip(),
+                        "rfc": str(datos['rfc_cliente']).strip(),
+                        "monto": float(datos['monto_solicitado']),
+                        "saldo_pendiente": float(datos['monto_solicitado']),
+                        "plazo_meses": int(datos['plazo_meses']),
+                        "frecuencia": str(datos['frecuencia_pago']),
+                        "tasa_mensual": float(datos['tasa_mensual_asignada']),
+                        "tasa_anual": float(datos['tasa_anual_asignada']),
+                        "score_asignado": int(datos['score_crediticio']),
+                        "probabilidad_default": round(float(datos['prob_default']), 4),
+                        "estatus": "ACTIVO",
+                        "fecha_otorgamiento": fecha_corte_actual.strftime("%Y-%m-%d"),
+                        "proximo_vencimiento": fecha_primer_vencimiento.strftime("%Y-%m-%d"),
+                        "gestor_originador": f"{usuario_actual} | {info_doc}"
+                    }
+                    
+                    # Inserción en SQL
+                    supabase.table("prestamos").insert(payload_prestamo).execute()
+                    
+                    st.success(f"¡Crédito Formalizado con Éxito! El cliente **{datos['nombre_cliente']}** ya está guardado en el servidor.")
+                    st.info("**Siguiente paso:** Ve a la pestaña **4. Contratos y Legal**, selecciónalo en la lista y descarga su Pagaré.")
+                    
+                    # Limpiamos la memoria para que quede listo para el siguiente cliente
+                    del st.session_state["dictamen_evaluado"]
+                    
+                except Exception as e_sql:
+                    # Si la base de datos se queja, AHORA SÍ TE LO MOSTRARÁ EN ROJO
+                    st.error(f"ERROR SQL AL GUARDAR EN SUPABASE: {str(e_sql)}")
+                    st.write("Datos exactos que intentaron entrar:", payload_prestamo)
