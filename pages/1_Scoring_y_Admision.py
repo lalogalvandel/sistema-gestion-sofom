@@ -307,9 +307,11 @@ if "dictamen_evaluado" in st.session_state:
                     fecha_primer_vencimiento = fecha_corte_actual + timedelta(days=dias_periodo)
                     
                     payload_prestamo = {
+                        "id_cliente": str(datos['rfc_cliente']).strip(),
                         "cliente": str(datos['nombre_cliente']).strip(),
                         "rfc": str(datos['rfc_cliente']).strip(),
                         "monto": float(datos['monto_solicitado']),
+                        "monto_principal": float(datos['monto_solicitado']), # <--- BLINDAJE CONTRA ESQUEMAS VIEJOS
                         "saldo_pendiente": float(datos['monto_solicitado']),
                         "plazo_meses": int(datos['plazo_meses']),
                         "frecuencia": str(datos['frecuencia_pago']),
