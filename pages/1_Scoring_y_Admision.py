@@ -280,11 +280,11 @@ if "dictamen_evaluado" in st.session_state:
         
         col_conf1, col_conf2 = st.columns([1, 2])
         with col_conf1:
-            # Al estar fuera del form y usando memoria, este botón SÍ responderá al clic
-            btn_guardar_prestamo = st.button("Formalizar y Enviar a Cartera Viva", width="stretch", type="primary")
+            # 1. BOTÓN INSTITUCIONAL: Ahora dice la verdad de lo que hace en esta etapa
+            btn_guardar_prestamo = st.button("Aprobar Solicitud y Enviar a Estructuración", width="stretch", type="primary")
         
         if btn_guardar_prestamo:
-            with st.spinner("Subiendo expediente a bóveda e inscribiendo crédito..."):
+            with st.spinner("Subiendo expediente a bóveda y turnando a Mesa de Estructuración..."):
                 info_doc = "Sin documento adjunto"
                 if archivo_kyc is not None:
                     try:
@@ -311,7 +311,7 @@ if "dictamen_evaluado" in st.session_state:
                         "cliente": str(datos['nombre_cliente']).strip(),
                         "rfc": str(datos['rfc_cliente']).strip(),
                         "monto": float(datos['monto_solicitado']),
-                        "monto_principal": float(datos['monto_solicitado']), # <--- BLINDAJE CONTRA ESQUEMAS VIEJOS
+                        "monto_principal": float(datos['monto_solicitado']), # Blindaje contra esquemas viejos
                         "saldo_pendiente": float(datos['monto_solicitado']),
                         "plazo_meses": int(datos['plazo_meses']),
                         "frecuencia": str(datos['frecuencia_pago']),
@@ -319,7 +319,7 @@ if "dictamen_evaluado" in st.session_state:
                         "tasa_anual": float(datos['tasa_anual_asignada']),
                         "score_asignado": int(datos['score_crediticio']),
                         "probabilidad_default": round(float(datos['prob_default']), 4),
-                        "estatus": "ACTIVO",
+                        "estatus": "APROBADO", # <--- 2. LA CLAVE: Nace como "APROBADO", esperando su tabla de pagos
                         "fecha_otorgamiento": fecha_corte_actual.strftime("%Y-%m-%d"),
                         "proximo_vencimiento": fecha_primer_vencimiento.strftime("%Y-%m-%d"),
                         "gestor_originador": f"{usuario_actual} | {info_doc}"
@@ -328,13 +328,13 @@ if "dictamen_evaluado" in st.session_state:
                     # Inserción en SQL
                     supabase.table("prestamos").insert(payload_prestamo).execute()
                     
-                    st.success(f"¡Crédito Formalizado con Éxito! El cliente **{datos['nombre_cliente']}** ya está guardado en el servidor.")
-                    st.info("**Siguiente paso:** Ve a la pestaña **4. Contratos y Legal**, selecciónalo en la lista y descarga su Pagaré.")
+                    # 3. MENSAJES CONGRUENTES: Ahora mandamos al ejecutivo al paso correcto (Módulo 2)
+                    st.success(f"¡Visto Bueno Actuarial! La solicitud para **{datos['nombre_cliente']}** fue aprobada e inscrita en el servidor.")
+                    st.info("**Siguiente paso del pipeline:** Ve a la pestaña **2. Amortización**. Ahí aparecerá este cliente disponible en la lista para calcular su calendario de cuotas y anexarlo.")
                     
                     # Limpiamos la memoria para que quede listo para el siguiente cliente
                     del st.session_state["dictamen_evaluado"]
                     
                 except Exception as e_sql:
-                    # Si la base de datos se queja, AHORA SÍ TE LO MOSTRARÁ EN ROJO
                     st.error(f"ERROR SQL AL GUARDAR EN SUPABASE: {str(e_sql)}")
                     st.write("Datos exactos que intentaron entrar:", payload_prestamo)

@@ -91,16 +91,9 @@ titulo_seccion("documento", "1. Selección de Crédito y Expediente por Formaliz
 @st.cache_data(ttl=20)
 def obtener_creditos_candidatos():
     try:
-        res = supabase.table("prestamos").select("*").execute()
-        if not res.data:
-            return pd.DataFrame()
-        df = pd.DataFrame(res.data)
-        
-        col_estatus = "estatus" if "estatus" in df.columns else ("estado" if "estado" in df.columns else None)
-        if col_estatus:
-            df["estatus_norm"] = df[col_estatus].astype(str).str.upper().str.strip()
-            df = df[df["estatus_norm"].isin(["ACTIVO", "VIGENTE", "APROBADO", "EN CURSO", "PENDIENTE"])]
-        return df
+        # Solo aparecen los que ya fueron aprobados y tienen calendario calculado
+        res = supabase.table("prestamos").select("*").eq("estatus", "ESTRUCTURADO").execute()
+        return pd.DataFrame(res.data) if res.data else pd.DataFrame()
     except Exception:
         return pd.DataFrame()
 
@@ -317,21 +310,24 @@ with col_btn1:
     btn_generar = st.button("Compilar Expediente en PDF", type="primary", use_container_width=True)
 
 if btn_generar:
-    with st.spinner("Estructurando cláusulas y encriptando título de crédito en FPDF..."):
+    with st.spinner("Compilando contrato RECA y Pagaré Mercantil..."):
         try:
             pdf_bytes = generar_pdf_instrumento_legal()
             
-            # Registro en bitácora local de emisión
-            st.session_state["ultimo_reca_emitido"] = f"RECA-{rfc_cliente_op}-{datetime.now().strftime('%m%d%H%M')}"
+            # ACTIVACIÓN JURÍDICA: Cambiamos el estatus a VIGENTE (Cartera Viva)
+            supabase.table("prestamos").update({
+                "estatus": "VIGENTE",  # <--- AQUÍ NACE EL CRÉDITO Y LA OBLIGACIÓN DE COBRO
+                "fecha_formalizacion": datetime.now().strftime("%Y-%m-%d")
+            }).eq("rfc", rfc_cliente_op).execute()
             
-            st.success("¡Expediente jurídico compilado exitosamente! El Pagaré mercantil se encuentra incrustado en el cuerpo del contrato con validez ejecutiva.")
+            st.success("¡Crédito Formalizado y Desembolsado con Éxito! El Pagaré tiene fuerza ejecutiva y el expediente pasó a Cobranza.")
             
             st.download_button(
                 label="📥 Descargar Contrato y Pagaré Mercantil (PDF)",
                 data=pdf_bytes,
                 file_name=f"Contrato_Pagare_{rfc_cliente_op}_{datetime.now().strftime('%Y%m%d')}.pdf",
                 mime="application/pdf",
-                use_container_width=True
+                width="stretch"
             )
         except Exception as e:
-            st.error(f"Error técnico durante la compilación del documento: {str(e)}")
+            st.error(f"Error en formalización legal: {str(e)}")

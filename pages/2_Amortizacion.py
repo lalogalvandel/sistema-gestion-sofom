@@ -23,11 +23,11 @@ encabezado_modulo(
 
 def obtener_clientes_aprobados():
     try:
-        # 1. Leemos directamente de la tabla 'prestamos' donde guardamos las colocaciones del Módulo 1
-        res = supabase.table("prestamos").select("*").in_("estatus", ["ACTIVO", "VIGENTE", "APROBADO", "APROBADO PREFERENCIAL", "APROBADO CONDICIONADO"]).execute()
-        
-        if not res.data:
-            return []
+        # Solo leemos los que están listos para calcular calendario
+        res = supabase.table("prestamos").select("*").eq("estatus", "APROBADO").execute()
+        return res.data if res.data else []
+    except Exception:
+        return []
             
         # 2. Mapeamos las columnas de 'prestamos' al formato que espera este módulo de amortización
         clientes_formateados = []
@@ -207,23 +207,20 @@ if "credito_calculado" in st.session_state and st.session_state["credito_calcula
             use_container_width=True
         )
     with col_acc2:
-        if st.button("Formalizar Contrato en Base de Datos (Supabase)", type="primary", use_container_width=True):
-            with st.spinner("Ejecutando transacción contable en servidor..."):
-                datos_c = st.session_state["credito_calculado"]
-                payload_prestamo = {
-                    "id_cliente": datos_c["id_cliente"],
-                    "monto_principal": datos_c["monto_principal"],
-                    "tasa_interes_mensual": datos_c["tasa_interes_mensual"],
-                    "plazo_quincenas": datos_c["plazo_quincenas"],
-                    "cuota_fija_proyectada": datos_c["cuota_fija_proyectada"],
-                    "monto_total_recaudar": datos_c["monto_total_recaudar"],
-                    "fecha_desembolso": datos_c["fecha_desembolso"],
-                    "estatus_credito": datos_c["estatus_credito"]
-                }
+        if st.button("Guardar Calendario y Turnar a Jurídico", type="primary", width="stretch"):
+            with st.spinner("Inscribiendo tabla de amortización en el servidor..."):
                 try:
-                    id_prestamo_gen = formalizar_credito_y_amortización(payload_prestamo, datos_c["tabla_df"])
-                    dictamen("exito", "Contrato Formalizado Exitosamente en Supabase", f"ID Institucional del Préstamo: {id_prestamo_gen}. El calendario completo de pagos ha quedado registrado en la base de datos. Puede proceder al Módulo Legal o de Cobranza.")
+                    id_target = st.session_state["credito_calculado"]["id_cliente"]
+                    
+                    # Actualizamos el registro con el cálculo contable exacto y cambiamos estatus
+                    supabase.table("prestamos").update({
+                        "cuota_fija_proyectada": st.session_state["credito_calculado"]["cuota_fija_proyectada"],
+                        "monto_total_recaudar": st.session_state["credito_calculado"]["monto_total_recaudar"],
+                        "estatus": "ESTRUCTURADO"  # <--- AVANZA AL PASO 2
+                    }).eq("rfc", id_target).execute() # o por id_prestamo si lo tienes
+                    
+                    dictamen("exito", "Estructuración Contable Completa", "El calendario se ha enlazado al expediente. El cliente está listo en la Mesa Jurídica para la emisión de su Pagaré.")
                 except Exception as e:
-                    dictamen("peligro", "Fallo en Transacción", f"No se pudo completar la formalización contractual en el servidor: {str(e)}")
+                    dictamen("peligro", "Error en Estructuración", f"Detalle técnico: {str(e)}")
 else:
     st.info("Configure los parámetros y presione el botón de cálculo para visualizar el calendario formal.")
