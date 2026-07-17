@@ -23,9 +23,27 @@ encabezado_modulo(
 
 def obtener_clientes_aprobados():
     try:
-        res = supabase.table("clientes").select("id_cliente, nombre_completo, rfc, estatus_admision").in_("estatus_admision", ["APROBADO", "CONDICIONADO"]).order("fecha_registro", desc=True).execute()
-        return res.data if res.data else []
-    except Exception:
+        # 1. Leemos directamente de la tabla 'prestamos' donde guardamos las colocaciones del Módulo 1
+        res = supabase.table("prestamos").select("*").in_("estatus", ["ACTIVO", "VIGENTE", "APROBADO", "APROBADO PREFERENCIAL", "APROBADO CONDICIONADO"]).execute()
+        
+        if not res.data:
+            return []
+            
+        # 2. Mapeamos las columnas de 'prestamos' al formato que espera este módulo de amortización
+        clientes_formateados = []
+        for p in res.data:
+            clientes_formateados.append({
+                "id_cliente": p.get("id_cliente") or p.get("rfc") or p.get("id_prestamo", "SIN-ID"),
+                "nombre_completo": p.get("cliente", "Deudor sin nombre"),
+                "rfc": p.get("rfc", "XAXX010101000"),
+                "estatus_admision": p.get("estatus", "ACTIVO"),
+                # Extraemos también el monto y la tasa para que el formulario se llene solo:
+                "monto_aprobado": p.get("monto", p.get("saldo_pendiente", 15000.0)),
+                "tasa_mensual": p.get("tasa_mensual", 6.0)
+            })
+        return clientes_formateados
+    except Exception as e:
+        # Si algo falla en la red, devolvemos lista vacía sin romper la pantalla
         return []
 
 clientes_db = obtener_clientes_aprobados()
@@ -59,8 +77,12 @@ with col_param:
             nombre_mostrar = cliente_sel["nombre_completo"]
             rfc_mostrar = cliente_sel["rfc"]
             
-            monto_init = 15000.0
-            tasa_init = 6.0
+            # Tomamos los valores directos que vienen de la base de datos de colocación
+            monto_init = float(cliente_sel.get("monto_aprobado", 15000.0))
+            
+            # Ajustamos la tasa por si viene en decimal (0.015) o en porcentaje directo (1.5)
+            val_tasa = float(cliente_sel.get("tasa_mensual", 6.0))
+            tasa_init = val_tasa if val_tasa > 1.0 else round(val_tasa * 100.0, 2)
             if "expediente_activo" in st.session_state and st.session_state["expediente_activo"].get("id_cliente") == id_cliente:
                 monto_init = float(st.session_state["expediente_activo"].get("monto_aprobado", 15000.0))
                 tasa_init = float(st.session_state["expediente_activo"].get("tasa_mensual", 0.06)) * 100.0
