@@ -284,15 +284,21 @@ def tarjeta_protocolo(titulo, items, nombre_icono=None):
     )
     st.markdown(f'<div class="sofom-tarjeta"><h4>{icono_html}{titulo}</h4>{filas}</div>', unsafe_allow_html=True)
 
+import re # Asegúrate de importar re al inicio del archivo
+
 def dictamen(estatus, titulo_txt, texto_txt):
     icon_map = {"exito": "verificado", "alerta": "alerta_triangulo", "peligro": "cancelado"}
     color_map = {"exito": PALETA["exito"], "alerta": PALETA["alerta"], "peligro": PALETA["peligro"]}
+    
+    # Limpieza: Convierte **texto** a <strong>texto</strong> para que HTML lo interprete
+    texto_procesado = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', texto_txt)
+    
     st.markdown(f"""
     <div class="sofom-dictamen {estatus}">
         {icono(icon_map[estatus], color=color_map[estatus], size=24)}
         <div>
             <div class="sofom-dictamen-titulo">{titulo_txt}</div>
-            <div class="sofom-dictamen-texto">{texto_txt}</div>
+            <div class="sofom-dictamen-texto">{texto_procesado}</div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """, unsafe_html=True)

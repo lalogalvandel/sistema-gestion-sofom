@@ -264,8 +264,21 @@ if ejecutar_evaluacion:
                 btn_guardar_prestamo = st.button("Formalizar y Enviar a Cartera Viva", use_container_width=True, type="primary")
             
             if btn_guardar_prestamo:
-                with st.spinner("Inscribiendo contrato y metadata de auditoría en la base de datos central..."):
+                with st.spinner("Subiendo expediente a bóveda segura e inscribiendo crédito..."):
                     try:
+                        # 1. Preparación del archivo para Storage
+                        # Definimos una ruta única basada en RFC y tiempo para evitar colisiones
+                        nombre_archivo_storage = f"kyc/{rfc_cliente.strip()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                        file_bytes = archivo_kyc.getvalue()
+                        
+                        # 2. Subida al bucket 'expedientes' en Supabase
+                        res_storage = supabase.storage.from_("expedientes").upload(
+                            path=nombre_archivo_storage,
+                            file=file_bytes,
+                            file_options={"content-type": "application/pdf"}
+                        )
+                        
+                        # 3. Inserción de datos en la tabla 'prestamos'
                         fecha_corte_actual = datetime.now()
                         dias_periodo = 15 if frecuencia_pago == "Quincenal" else 30
                         fecha_primer_vencimiento = fecha_corte_actual + timedelta(days=dias_periodo)
@@ -284,11 +297,14 @@ if ejecutar_evaluacion:
                             "estatus": "ACTIVO",
                             "fecha_otorgamiento": fecha_corte_actual.strftime("%Y-%m-%d"),
                             "proximo_vencimiento": fecha_primer_vencimiento.strftime("%Y-%m-%d"),
-                            "gestor_originador": f"{usuario_actual} | Doc: {archivo_kyc.name}"
+                            # Guardamos la ruta del archivo en Storage para futura auditoría
+                            "gestor_originador": f"{usuario_actual} | Doc: {nombre_archivo_storage}"
                         }
                         
                         supabase.table("prestamos").insert(payload_prestamo).execute()
                         
-                        st.success(f"El crédito a nombre de {nombre_cliente} fue formalizado exitosamente con una tasa de {tasa_mensual_asignada}% mensual. El registro incluye la trazabilidad del archivo '{archivo_kyc.name}' bajo responsabilidad de {usuario_actual}.")
+                        st.success(f"¡Formalización Exitosa! El crédito a nombre de {nombre_cliente} está activo. El expediente digital ha sido almacenado permanentemente en la bóveda 'expedientes'.")
+                        
                     except Exception as e:
-                        dictamen("peligro", "Nota de Conexión SQL", f"La evaluación algorítmica se ejecutó con éxito y el pricing está confirmado. Para persistir el alta automática, asegúrese de que la tabla 'prestamos' cuente con las columnas compatibles en Supabase. Detalle: {str(e)}")
+                        # Si algo falla (subida o inserción), informamos al gestor
+                        dictamen("peligro", "Error en Formalización", f"No fue posible completar la formalización. Detalle técnico: {str(e)}")
