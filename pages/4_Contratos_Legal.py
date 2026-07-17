@@ -126,18 +126,15 @@ else:
     idx_sel = df_prestamos["etiqueta_sel"].tolist().index(credito_seleccionado)
     fila_credito = df_prestamos.iloc[idx_sel]
     
-    # Variables financieras del crédito (Blindadas con pd.to_numeric para evitar TypeError)
-    val_monto = fila_credito.get(col_mon, fila_credito.get("monto_prestado", fila_credito.get("saldo_pendiente", 15000.0)))
-    monto_op = float(pd.to_numeric(val_monto, errors="coerce"))
-    if pd.isna(monto_op) or monto_op <= 0: monto_op = 15000.0
+    # --- EXTRACCIÓN Y BLINDAJE NUMÉRICO (Validando NaN antes de convertir) ---
+    val_monto = pd.to_numeric(fila_credito.get(col_mon, fila_credito.get("monto_prestado", fila_credito.get("saldo_pendiente", 15000.0))), errors="coerce")
+    monto_op = 15000.0 if (pd.isna(val_monto) or val_monto <= 0) else float(val_monto)
 
-    val_plazo = fila_credito.get("plazo_meses", fila_credito.get("plazo", 12))
-    plazo_op = int(pd.to_numeric(val_plazo, errors="coerce"))
-    if pd.isna(plazo_op) or plazo_op <= 0: plazo_op = 12
+    val_plazo = pd.to_numeric(fila_credito.get("plazo_meses", fila_credito.get("plazo", 12)), errors="coerce")
+    plazo_op = 12 if (pd.isna(val_plazo) or val_plazo <= 0) else int(val_plazo)
 
-    val_tasa = fila_credito.get("tasa_mensual", fila_credito.get("tasa", 6.0))
-    tasa_mes_op = float(pd.to_numeric(val_tasa, errors="coerce"))
-    if pd.isna(tasa_mes_op) or tasa_mes_op <= 0: tasa_mes_op = 6.0
+    val_tasa = pd.to_numeric(fila_credito.get("tasa_mensual", fila_credito.get("tasa", 6.0)), errors="coerce")
+    tasa_mes_op = 6.0 if (pd.isna(val_tasa) or val_tasa <= 0) else float(val_tasa)
 
     frec_op = str(fila_credito.get("frecuencia", "Mensual")).capitalize()
     nombre_cliente_op = str(fila_credito.get(col_nom, "Acreditado Institucional"))
