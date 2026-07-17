@@ -18,8 +18,8 @@ aplicar_identidad_visual()
 
 encabezado_modulo(
     titulo="Ventanilla de Cobranza y Recaudación",
-    titulo_icono="banco",
     subtitulo="Ingreso de abonos quincenales/mensuales, amortización contable de saldo insoluto y liberación de pagarés.",
+    nombre_icono="banco",  # <--- CORREGIDO: aquí decía titulo_icono="banco"
     insignia="TESORERÍA Y CAJA"
 )
 
