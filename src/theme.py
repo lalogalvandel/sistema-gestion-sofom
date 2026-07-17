@@ -285,23 +285,22 @@ def tarjeta_protocolo(titulo, items, nombre_icono=None):
     )
     st.markdown(f'<div class="sofom-tarjeta"><h4>{icono_html}{titulo}</h4>{filas}</div>', unsafe_allow_html=True)
 
-import re # Asegúrate de importar re al inicio del archivo
 
 def dictamen(estatus, titulo_txt, texto_txt):
-    # Validaciones de seguridad
+    # 1. Blindaje contra valores nulos (evita que el texto rompa la app)
     if texto_txt is None:
-        texto_txt = "Error: Sin mensaje de dictamen disponible."
+        texto_txt = "Sin mensaje de dictamen disponible."
     if titulo_txt is None:
-        titulo_txt = "Aviso"
+        titulo_txt = "Aviso Institucional"
         
     icon_map = {"exito": "verificado", "alerta": "alerta_triangulo", "peligro": "cancelado"}
-    color_map = {"exito": PALETA["exito"], "alerta": PALETA["alerta"], "peligro": PALETA["peligro"]}
+    color_map = {"exito": PALETA.get("exito", "#10B981"), "alerta": PALETA.get("alerta", "#F59E0B"), "peligro": PALETA.get("peligro", "#EF4444")}
     
-    # Limpieza: Convertir **texto** a <strong>texto</strong>
-    # Nos aseguramos de que sea string antes de hacer el sub
+    # 2. Limpieza de formato: convierte **texto** en <strong>texto</strong> para negritas HTML
     texto_seguro = str(texto_txt)
     texto_procesado = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', texto_seguro)
     
+    # 3. Renderizado en Streamlit con EL PARÁMETRO CORRECTO: unsafe_allow_html=True
     st.markdown(f"""
     <div class="sofom-dictamen {estatus}">
         {icono(icon_map.get(estatus, 'alerta_triangulo'), color=color_map.get(estatus, '#000'), size=24)}
@@ -310,4 +309,4 @@ def dictamen(estatus, titulo_txt, texto_txt):
             <div class="sofom-dictamen-texto">{texto_procesado}</div>
         </div>
     </div>
-    """, unsafe_html=True)
+    """, unsafe_allow_html=True)
