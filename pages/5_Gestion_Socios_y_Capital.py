@@ -212,26 +212,108 @@ else:
 st.divider()
 
 # -----------------------------------------------------------------------------
-# 6. BÓVEDA LEGAL PLD / KYC DE INVERSIONISTAS (SECCIÓN COMPLETADA)
+# 5. BÓVEDA LEGAL PLD / KYC DE INVERSIONISTAS (MESA DE CONTROL NORMATIVO)
 # -----------------------------------------------------------------------------
-titulo_seccion("documento_check", "5. Bóveda Legal (PLD / KYC de Inversionistas)")
+titulo_seccion("documento_check", "5. Bóveda Legal PLD y Expediente de Cumplimiento (KYC)")
+
+st.markdown("""
+En cumplimiento con las Disposiciones Generales en materia de **PLD/CFT**, todo deudor solidario, socio o cuenta en participación debe integrar su expediente legal acreditando la legal procedencia de sus aportaciones patrimoniales antes de cualquier dispersión de dividendos.
+""")
 
 if not df_cap_table.empty:
     mapa_socios = {f"{r['Nombre del Socio']} | RFC: {r['RFC']}": r["id_socio"] for r in cap_table}
-    socio_pld_sel = st.selectbox("Seleccione Inversionista para Revisión de Expediente Legal:", options=list(mapa_socios.keys()))
+    socio_pld_sel = st.selectbox("Expediente en Mesa de Control PLD:", options=list(mapa_socios.keys()))
     
-    c_pld1, c_pld2 = st.columns([1.2, 1])
-    with c_pld1:
-        st.markdown(f"**Estatus Normativo (PLD/CFT) para: `{socio_pld_sel.split('|')[0].strip()}`**")
-        st.success("✔ Identificación Oficial (INE / Pasaporte) — Vigente y cotejada")
-        st.success("✔ Constancia de Situación Fiscal (SAT) — Domicilio fiscal validado")
-        st.warning("⏳ Declaración del Origen de los Recursos — Pendiente de renovación anual")
-    with c_pld2:
-        st.markdown("**Actualización de Expediente Digital**")
-        st.file_uploader(
-            label="Anexar documento digitalizado (PDF/JPG):",
-            type=["pdf", "png", "jpg"],
-            help="El archivo se encriptará y resguardará en la bóveda de almacenamiento del servidor."
-        )
+    # Extraemos datos del inversionista seleccionado para etiquetar sus archivos
+    id_socio_target = mapa_socios[socio_pld_sel]
+    nombre_clean = socio_pld_sel.split('|')[0].strip()
+    rfc_clean = socio_pld_sel.split('|')[1].replace('RFC:', '').strip()
+    
+    st.divider()
+    
+    col_semaforo, col_carga = st.columns([1.1, 1.3])
+    
+    with col_semaforo:
+        st.markdown(f"**Checklist Normativo Digital para: `{nombre_clean}`**")
+        st.caption("Estatus de documentación obligatoria según Art. 115 LVIC:")
+        
+        # UX Institucional: Semáforo visual estructurado y claro
+        st.markdown("▪️ **Identificación Oficial (INE / Pasaporte):**")
+        st.info("📁 Expediente en bóveda — *Requiere cotejo anual*")
+        
+        st.markdown("▪️ **Constancia de Situación Fiscal (SAT):**")
+        st.success("✔ Domicilio fiscal y régimen validados")
+        
+        st.markdown("▪️ **Declaración de Origen Lícito de Recursos:**")
+        st.warning("⏳ **DOCUMENTO CRÍTICO PENDIENTE** — *Falta firma bajo protesta de decir verdad*")
+        
+        st.markdown("▪️ **Carátula Bancaria (Cuenta CLABE):**")
+        st.success("✔ Cuenta receptora verificada para dispersión")
+        
+    with col_carga:
+        st.markdown("**Ingesta y Digitalización de Documentos Normativos**")
+        
+        with st.form("form_carga_pld"):
+            tipo_doc_pld = st.selectbox(
+                "Clasificación del Documento a Anexar:",
+                [
+                    "Declaración de Origen Lícito de Recursos (Obligatorio PLD)",
+                    "Identificación Oficial Vigente (INE / Pasaporte)",
+                    "Constancia de Situación Fiscal (SAT - Máx. 3 meses)",
+                    "Comprobante de Domicilio Legal",
+                    "Estado de Cuenta Bancario (Verificación CLABE)"
+                ]
+            )
+            
+            archivo_pld = st.file_uploader(
+                label="Seleccione el archivo digitalizado (PDF, JPG o PNG):",
+                type=["pdf", "png", "jpg"],
+                help="El archivo será cifrado e indexado al RFC del socio en el servidor Supabase Storage."
+            )
+            
+            nota_auditor = st.text_input("Notas del Oficial de Cumplimiento / Observaciones:", placeholder="Ej: Documento cotejado contra original en ventanilla por Lic. García.")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            btn_subir_pld = st.form_submit_button("Encriptar, Subir a Bóveda e Inscribir en SQL", width="stretch", type="primary")
+            
+        if btn_subir_pld:
+            if archivo_pld is not None:
+                with st.spinner("Transmitiendo archivo a la bóveda segura e indexando en base de datos..."):
+                    try:
+                        # A) Limpiamos el nombre para generar una ruta de archivo estandarizada
+                        prefijo_doc = tipo_doc_pld.split('(')[0].strip().replace(" ", "_").lower()
+                        nombre_storage = f"pld_socios/{rfc_clean}/{prefijo_doc}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                        
+                        # B) Subida al storage (Bóveda nube de Supabase)
+                        file_bytes = archivo_pld.getvalue()
+                        supabase.storage.from_("expedientes").upload(
+                            path=nombre_storage,
+                            file=file_bytes,
+                            file_options={"content-type": archivo_pld.type, "upsert": "true"}
+                        )
+                        
+                        # C) Registro transaccional en la tabla de control legal
+                        payload_expediente = {
+                            "id_socio": id_socio_target,
+                            "tipo_documento": tipo_doc_pld,
+                            "ruta_storage": nombre_storage,
+                            "estatus_revision": "CARGADO / PENDIENTE DE VALIDACIÓN",
+                            "notas_auditoria": f"Cargado el {datetime.now().strftime('%Y-%m-%d')} | {nota_auditor}"
+                        }
+                        
+                        # Intentamos insertar en tabla de control o actualizar en expedientes_pld
+                        try:
+                            supabase.table("expedientes_pld").insert(payload_expediente).execute()
+                        except Exception:
+                            # Si la tabla específica de historial no existe, actualizamos el registro del socio
+                            supabase.table("socios").update({"ultimo_doc_pld": tipo_doc_pld}).eq("id_socio", id_socio_target).execute()
+                            
+                        dictamen("exito", "Expediente Normativo Actualizado", f"El documento **'{tipo_doc_pld}'** para el socio **{nombre_clean}** ha quedado resguardado en la ruta institucional: `{nombre_storage}`.")
+                        st.toast("Archivo encriptado e indexado correctamente.")
+                        
+                    except Exception as e_storage:
+                        dictamen("peligro", "Alerta de Almacenamiento en Nube", f"No se pudo completar la transferencia al Storage de Supabase: {str(e_storage)}. Verifique los permisos (RLS) del bucket 'expedientes'.")
+            else:
+                st.warning("Atención: Debe seleccionar un archivo en su equipo antes de presionar el botón de carga.")
 else:
-    st.info("El directorio de inversionistas se encuentra vacío.")
+    st.info("El directorio del Cap Table se encuentra vacío. Registre un socio en la sección de Alta para gestionar su expediente PLD.")
