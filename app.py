@@ -26,25 +26,45 @@ encabezado_modulo(
     insignia="SOFOM E.N.R."
 )
 
-# 3. Consulta transaccional en tiempo real para KPIs
+# 3. Consulta transaccional en tiempo real para KPIs (BLINDADA)
 @st.cache_data(ttl=30)
 def obtener_kpis_cartera():
     try:
-        res_prestamos = supabase.table("prestamos").select("monto_principal, tasa_interes_mensual, estatus_credito").execute()
-        res_clientes = supabase.table("clientes").select("id_cliente", count="exact").execute()
+        # 1. Traemos todo de 'prestamos' para evitar errores si la columna se llama diferente
+        res_prestamos = supabase.table("prestamos").select("*").execute()
         
-        total_clientes = res_clientes.count if res_clientes.count is not None else 0
-        
-        if res_prestamos.data:
-            df_p = pd.DataFrame(res_prestamos.data)
-            capital_colocado = float(df_p["monto_principal"].sum())
-            prestamos_activos = len(df_p[df_p["estatus_credito"] == "VIGENTE"])
-            interes_mensual_proyectado = float((df_p["monto_principal"] * df_p["tasa_interes_mensual"]).sum())
-        else:
-            capital_colocado = 0.0
-            prestamos_activos = 0
-            interes_mensual_proyectado = 0.0
+        if not res_prestamos.data:
+            return 0, 0.0, 0, 0.0
             
+        df_p = pd.DataFrame(res_prestamos.data)
+        
+        # 2. Conteo real de expedientes únicos basándonos en los préstamos existentes
+        col_id = "rfc" if "rfc" in df_p.columns else ("id_cliente" if "id_cliente" in df_p.columns else None)
+        total_clientes = len(df_p[col_id].unique()) if col_id else len(df_p)
+        
+        # 3. Mapeo seguro del Monto Colocado
+        col_monto = "monto_principal" if "monto_principal" in df_p.columns and df_p["monto_principal"].sum() > 0 else ("monto" if "monto" in df_p.columns else None)
+        df_p["monto_calc"] = pd.to_numeric(df_p[col_monto], errors="coerce").fillna(0.0) if col_monto else 0.0
+        capital_colocado = float(df_p["monto_calc"].sum())
+        
+        # 4. Conteo flexible de créditos activos (busca en 'estatus' o 'estatus_credito')
+        col_estatus = "estatus" if "estatus" in df_p.columns else ("estatus_credito" if "estatus_credito" in df_p.columns else None)
+        if col_estatus:
+            df_p["estatus_norm"] = df_p[col_estatus].astype(str).str.upper().str.strip()
+            prestamos_activos = len(df_p[df_p["estatus_norm"].isin(["VIGENTE", "ACTIVO", "ESTRUCTURADO", "APROBADO"])])
+        else:
+            prestamos_activos = len(df_p)
+            
+        # 5. Mapeo seguro de Tasa y cálculo de Interés (ajustando decimales automáticamente)
+        col_tasa = "tasa_mensual" if "tasa_mensual" in df_p.columns else ("tasa_interes_mensual" if "tasa_interes_mensual" in df_p.columns else ("tasa" if "tasa" in df_p.columns else None))
+        df_p["tasa_calc"] = pd.to_numeric(df_p[col_tasa], errors="coerce").fillna(6.0) if col_tasa else 6.0
+        
+        # Si la tasa está en formato entero (ej. 6.0 en vez de 0.06), la convertimos a porcentaje
+        if df_p["tasa_calc"].mean() > 1.0:
+            df_p["tasa_calc"] = df_p["tasa_calc"] / 100.0
+            
+        interes_mensual_proyectado = float((df_p["monto_calc"] * df_p["tasa_calc"]).sum())
+        
         return total_clientes, capital_colocado, prestamos_activos, interes_mensual_proyectado
     except Exception:
         return 0, 0.0, 0, 0.0
