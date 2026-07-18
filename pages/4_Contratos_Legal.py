@@ -146,10 +146,15 @@ titulo_seccion("herramienta", "2. Parametrización Jurídica y Cláusulas del Co
 with st.form("form_parametros_legales"):
     c_leg1, c_leg2, c_leg3 = st.columns(3)
     with c_leg1:
-        razon_social_sofom = st.text_input("Razón Social de la Entidad:", value="FINANCIERA GALA SOFOM, E.N.R.")
-        representante_legal = st.text_input("Apoderado / Representante Legal:", value="Eduardo Galván del Río")
+        # Leemos de secrets si existe, o ponemos un nombre institucional genérico
+        val_razon = st.secrets.get("legal", {}).get("razon_social", "FINANCIERA GALA SOFOM, E.N.R.")
+        val_rep = st.secrets.get("legal", {}).get("representante_legal", "Apoderado Legal Institucional")
+        
+        razon_social_sofom = st.text_input("Razón Social de la Entidad:", value=val_razon)
+        representante_legal = st.text_input("Apoderado / Representante Legal:", value=val_rep)
     with c_leg2:
-        num_reca = st.text_input("No. Registro CONDUSEF (RECA):", value="2026-001-09238-01")
+        val_reca = st.secrets.get("legal", {}).get("reca_numero", "2026-001-09238-01")
+        num_reca = st.text_input("No. Registro CONDUSEF (RECA):", value=val_reca)
         plaza_jurisdiccion = st.selectbox("Plaza de Jurisdicción Contenciosa:", [
             "Puebla de Zaragoza, Puebla",
             "Ciudad de México",
@@ -163,14 +168,25 @@ with st.form("form_parametros_legales"):
     st.markdown("---")
     c_aval1, c_aval2 = st.columns(2)
     with c_aval1:
-        requiere_aval = st.checkbox("Incluir figura de Aval / Obligado Solidario", value=True)
-        nombre_aval = st.text_input("Nombre Completo del Aval:", value="Ramiro Galván Barbosa" if requiere_aval else "N/A", disabled=not requiere_aval)
+        # Por prudencia financiera, el aval inicia desmarcado y las casillas LIMPIAS
+        requiere_aval = st.checkbox("Incluir figura de Aval / Obligado Solidario", value=False)
+        nombre_aval = st.text_input(
+            "Nombre Completo del Aval:", 
+            value="" if requiere_aval else "N/A", 
+            placeholder="Ej: Nombre Completo del Obligado Solidario", 
+            disabled=not requiere_aval
+        )
     with c_aval2:
         st.markdown("<br>", unsafe_allow_html=True)
-        domicilio_aval = st.text_input("Domicilio Legal para Emplazamiento:", value="Av. Reforma Sur #104, Col. Centro, Puebla, Pue." if requiere_aval else "N/A", disabled=not requiere_aval)
+        domicilio_aval = st.text_input(
+            "Domicilio Legal para Emplazamiento:", 
+            value="" if requiere_aval else "N/A", 
+            placeholder="Ej: Av. Principal #100, Col. Centro, Municipio, Estado", 
+            disabled=not requiere_aval
+        )
 
     st.markdown("<br>", unsafe_allow_html=True)
-    actualizar_calculos = st.form_submit_button("Auditar Parámetros y Calcular CAT Oficial", use_container_width=True)
+    actualizar_calculos = st.form_submit_button("Auditar Parámetros y Calcular CAT Oficial", width="stretch")
 
 # Ejecución algorítmica CAT
 cat_oficial_calc, cuota_periodica_calc = calcular_cat_banxico(
