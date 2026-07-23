@@ -1,0 +1,21 @@
+
+LICENCIA DE SOFTWARE DE PROPIEDAD EXCLUSIVA (PROPRIETARY LICENSE)
+
+
+Copyright (c) 2026 Eduardo Galván del Rio.
+Todos los derechos reservados.
+
+Este software, su arquitectura, base de datos y código fuente son PROPIEDAD EXCLUSIVA de Eduardo Galván del Rio. El presente proyecto NO ES SOFTWARE LIBRE ni de código abierto (Open Source).
+
+1. RESTRICCIONES DE USO Y DISTRIBUCIÓN:
+Queda estrictamente prohibida la copia, reproducción, distribución, publicación, ingeniería inversa, modificación, uso comercial o uso interno de este código fuente, en su totalidad o en partes, sin el consentimiento previo, expreso y por escrito del autor.
+
+2. CONFIDENCIALIDAD:
+El acceso a este código fuente se otorga únicamente con fines de auditoría y evaluación bajo un acuerdo de estricta confidencialidad. El acceso no otorga ningún derecho de propiedad, licencia de uso ni permiso de explotación.
+
+3. PENALIZACIÓN:
+Cualquier uso no autorizado de este software, comercialización del mismo o apropiación de su propiedad intelectual será perseguido bajo las leyes de Derechos de Autor y Propiedad Industrial aplicables en los Estados Unidos Mexicanos y en el ámbito internacional.
+
+Autor y Titular de los Derechos Patrimoniales: Eduardo Galván del Rio.
+Lugar: Puebla, México.
+Año: 2026.

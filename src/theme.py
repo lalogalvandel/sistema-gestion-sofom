@@ -1,16 +1,16 @@
-# =============================================================================
+# 
 # Copyright (c) 2026 Eduardo Galván del Rio. Todos los derechos reservados.
 # 
 # Este código fuente es propiedad exclusiva y confidencial. Queda estrictamente
 # prohibida su reproducción, distribución, comercialización o modificación
 # sin autorización expresa y por escrito del autor.
-# =============================================================================
+# 
 import streamlit as st
 import re
 
-# =============================================================================
+# 
 # 1. PALETA DE COLORES INSTITUCIONAL
-# =============================================================================
+# 
 PALETA = {
     "marino_900": "#0F172A",  # Pizarra oscuro para textos principales (máxima legibilidad)
     "marino_800": "#1A365D",  # Azul institucional para bordes y acentos
@@ -60,9 +60,9 @@ def plantilla_plotly(fig, altura=300, leyenda=False):
     fig.update_yaxes(gridcolor=PALETA["linea_100"], zeroline=False, tickfont=dict(color=PALETA["tinta_600"]))
     return fig
 
-# =============================================================================
+# 
 # 2. ICONOGRAFÍA LINEAL SVG
-# =============================================================================
+# 
 ICONOS = {
     "banco": '<polygon points="12,3 21,9 3,9"/><line x1="4" y1="21" x2="20" y2="21"/><line x1="5" y1="10" x2="5" y2="21"/><line x1="9" y1="10" x2="9" y2="21"/><line x1="15" y1="10" x2="15" y2="21"/><line x1="19" y1="10" x2="19" y2="21"/>',
     "billetera": '<rect x="2.5" y="6.5" width="19" height="13" rx="2"/><path d="M2.5 10h19"/><circle cx="17" cy="14.5" r="1.4" fill="currentColor" stroke="none"/>',
@@ -92,9 +92,9 @@ def icono(nombre, color=None, size=18):
         f'{contenido}</svg>'
     )
 
-# =============================================================================
+# 
 # 3. HOJA DE ESTILOS ARMONIZADA Y BLINDADA
-# =============================================================================
+# 
 def aplicar_identidad_visual():
     st.markdown(f"""
     <style>
@@ -251,9 +251,9 @@ def aplicar_identidad_visual():
     </style>
     """, unsafe_allow_html=True)
 
-# =============================================================================
+# 
 # 4. COMPONENTES REUTILIZABLES
-# =============================================================================
+# 
 def encabezado_modulo(titulo, subtitulo, nombre_icono=None, insignia=None):
     icono_html = icono(nombre_icono, color=PALETA["marino_800"], size=30) if nombre_icono else ""
     insignia_html = f'<span class="sofom-insignia"><span class="punto"></span>{insignia}</span>' if insignia else ""
