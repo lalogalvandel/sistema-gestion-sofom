@@ -25,7 +25,21 @@ aplicar_identidad_visual()
 st.markdown("<br><br>", unsafe_allow_html=True)
 st.title("Acceso Institucional SOFOM")
 st.markdown("---")
-
+# =====================================================================
+# BOTÓN TEMPORAL PARA INYECTAR USUARIOS (BORRAR DESPUÉS DE USAR)
+if st.button("🚨 FORZAR CREACIÓN DE USUARIOS DE PRUEBA"):
+    try:
+        # Generamos el hash nativo con TU propia computadora
+        hash_pass = bcrypt.hashpw("admin123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        
+        # Inyectamos directamente a Supabase
+        supabase.table("usuarios").insert({"email": "auditor@sofom.com", "password": hash_pass, "rol": "AUDITOR"}).execute()
+        supabase.table("usuarios").insert({"email": "cobranza@sofom.com", "password": hash_pass, "rol": "COBRANZA"}).execute()
+        
+        st.success("✅ ¡Cuentas inyectadas con éxito! Ya puedes iniciar sesión y borrar este botón de tu código.")
+    except Exception as e:
+        st.error(f"Fallo al inyectar: {str(e)}")
+# =====================================================================
 with st.form("form_login_institucional"):
     email = st.text_input("Correo Electrónico Institucional:", placeholder="usuario@sofom.com")
     pwd = st.text_input("Contraseña de Acceso:", type="password")
