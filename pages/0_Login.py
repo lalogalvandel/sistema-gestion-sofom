@@ -10,7 +10,16 @@ import bcrypt
 from src.db import supabase
 from src.theme import aplicar_identidad_visual, dictamen
 
-st.set_page_config(page_title="Acceso | SOFOM E.N.R.", layout="centered")
+st.set_page_config(page_title="Acceso | SOFOM E.N.R.", layout="centered", initial_sidebar_state="collapsed")
+
+# Inyección de CSS para desaparecer el botón de abrir el menú lateral
+st.markdown("""
+    <style>
+        [data-testid="collapsedControl"] {display: none;}
+        [data-testid="stSidebar"] {display: none;}
+    </style>
+""", unsafe_allow_html=True)
+
 aplicar_identidad_visual()
 
 st.markdown("<br><br>", unsafe_allow_html=True)
@@ -40,7 +49,7 @@ if submit:
                     
                     st.success(f"Bienvenido. Sesión iniciada con perfil: {usuario['rol']}")
                     # Redirigir al dashboard principal después de loguear
-                    st.switch_page("pages/1_Scoring_y_Admision.py")
+                    st.switch_page("app.py")
                 else:
                     dictamen("peligro", "Error de Autenticación", "Las credenciales ingresadas no son válidas o el usuario no existe.")
             except Exception as e:
