@@ -76,9 +76,22 @@ def obtener_kpis_cartera():
     except Exception:
         return 0, 0.0, 0, 0.0
 
+@st.cache_data(ttl=30)
+def obtener_capital_fondo():
+    try:
+        res_apo = supabase.table("aportaciones_socios").select("monto, tipo_movimiento").execute()
+        if not res_apo.data: return 0.0
+        df_a = pd.DataFrame(res_apo.data)
+        inyecciones = pd.to_numeric(df_a[df_a["tipo_movimiento"] == "APORTACION"]["monto"], errors="coerce").sum()
+        retiros = pd.to_numeric(df_a[df_a["tipo_movimiento"] == "RETIRO"]["monto"], errors="coerce").sum()
+        return float(inyecciones - retiros)
+    except:
+        return 0.0
+
 total_cli, cap_colocado, prest_activos, int_proyectado = obtener_kpis_cartera()
-fondo_prueba_total = 150000.0
-capital_disponible = fondo_prueba_total - cap_colocado
+fondo_real_total = obtener_capital_fondo()
+
+capital_disponible = fondo_real_total - cap_colocado
 comision_proyectada = int_proyectado * 0.20
 
 titulo_seccion("tendencia", "Estado General del Fondo y Métricas de Cartera")
