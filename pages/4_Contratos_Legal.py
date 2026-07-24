@@ -345,7 +345,8 @@ if btn_generar:
             # B) LA ACTIVACIÓN JURÍDICA: Cambiamos el estatus a VIGENTE en el servidor
             target_id = str(rfc_cliente_op).strip()
             payload_formalizacion = {
-                "estatus": "VIGENTE", # <--- LA CORONA: El crédito nace legalmente aquí
+                "estatus": "VIGENTE", 
+                "estatus_credito": "VIGENTE", # <--- Sincronía total de la base de datos
                 "fecha_otorgamiento": datetime.now().strftime("%Y-%m-%d")
             }
             
