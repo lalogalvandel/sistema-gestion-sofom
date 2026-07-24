@@ -1,10 +1,10 @@
-# 
-# Copyright (c) 2026 Eduardo Galván del Rio. Todos los derechos reservados.
+# Copyright (c) 2026 Eduardo Galván del Río. Todos los derechos reservados.
 # 
 # Este código fuente es propiedad exclusiva y confidencial. Queda estrictamente
 # prohibida su reproducción, distribución, comercialización o modificación
 # sin autorización expresa y por escrito del autor.
-# 
+# =============================================================================
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
@@ -26,7 +26,7 @@ aplicar_identidad_visual()
 encabezado_modulo(
     titulo="Ventanilla de Cobranza y Recaudación",
     subtitulo="Ingreso de abonos quincenales/mensuales, amortización contable de saldo insoluto y liberación de pagarés.",
-    nombre_icono="banco",  # <--- CORREGIDO: aquí decía titulo_icono="banco"
+    nombre_icono="banco",
     insignia="TESORERÍA Y CAJA"
 )
 
@@ -38,7 +38,7 @@ usuario_actual = st.session_state.get("user_email", "Ejecutivo de Caja")
 @st.cache_data(ttl=10)
 def obtener_cartera_viva():
     try:
-        # Traemos estrictamente los créditos que ya pasaron por el Módulo 4 (Jurídico)
+        # Traemos estrictamente los créditos activos o en mora
         res = supabase.table("prestamos").select("*").in_("estatus", ["VIGENTE", "ACTIVO", "MORA"]).order("cliente", desc=False).execute()
         return res.data if res.data else []
     except Exception:
@@ -137,7 +137,9 @@ if cliente_sel != "-- Seleccione un Deudor para Registro de Pago --":
         st.markdown("<br>", unsafe_allow_html=True)
         btn_cobrar = st.form_submit_button("Confirmar Abono y Aplicar a Saldo en Servidor", type="primary", width="stretch")
 
-    # Ejecución transaccional al presionar el botón
+    # -------------------------------------------------------------------------
+    # 3. EJECUCIÓN TRANSACCIONAL (BASE DE DATOS Y BITÁCORA)
+    # -------------------------------------------------------------------------
     if btn_cobrar:
         with st.spinner("Procesando transacción bancaria y actualizando tabla de préstamos..."):
             try:
@@ -153,24 +155,39 @@ if cliente_sel != "-- Seleccione un Deudor para Registro de Pago --":
                 payload_pago = {
                     "saldo_pendiente": nuevo_saldo_real,
                     "estatus": nuevo_estatus,
+                    "estatus_credito": nuevo_estatus,
                     "proximo_vencimiento": nueva_fecha_venc
                 }
                 
-                # Actualizamos en Supabase
-                res_upd = supabase.table("prestamos").update(payload_pago).eq("rfc", target_id).execute()
-                if not res_upd.data:
-                    res_upd = supabase.table("prestamos").update(payload_pago).eq("cliente", datos_deudor.get("cliente")).execute()
-                    
-                st.toast(f"Pago por ${monto_ingresado:,.2f} registrado.", icon="✅")
-                
-                if nuevo_estatus == "LIQUIDADO":
-                    dictamen("exito", "¡CRÉDITO LIQUIDADO EN SU TOTALIDAD!", f"El deudor **{datos_deudor.get('cliente')}** ha cubierto el 100% de su saldo insoluto. El pagaré mercantil queda liberado y su estatus cambió a **LIQUIDADO**.")
+                # 1. Actualizamos el saldo en la base de datos de Préstamos
+                id_target = datos_deudor.get("id_prestamo")
+                if id_target:
+                    res_upd = supabase.table("prestamos").update(payload_pago).eq("id_prestamo", id_target).execute()
                 else:
-                    dictamen("exito", "Abono Aplicado Correctamente", f"Se aplicaron **${abono_capital:,.2f}** a capital. El nuevo saldo exigible de **{datos_deudor.get('cliente')}** es de **${nuevo_saldo_real:,.2f} MXN**. Próximo vencimiento programado para el {nueva_fecha_venc}.")
+                    res_upd = supabase.table("prestamos").update(payload_pago).eq("rfc", target_id).execute()
                 
-                st.info("**Dato operativo:** Refresca o selecciona otro cliente en el menú superior para continuar con la gestión de cobranza del día.")
+                # 2. Registrar en Bitácora Transaccional Inmutable
+                if id_target:
+                    texto_bitacora = f"Recibo: ${monto_ingresado:,.2f} vía {metodo_pago}. Capital bajó ${abono_capital}. Interés cobrado: ${interes_cobrado}. Ref: {referencia_bancaria}"
+                    supabase.table("bitacora_cobranza").insert({
+                        "id_credito_ref": str(id_target),
+                        "tipo_accion": "PAGO VENTANILLA",
+                        "notas": texto_bitacora,
+                        "usuario_gestor": usuario_actual
+                    }).execute()
+                    
+                st.toast(f"Pago por ${monto_ingresado:,.2f} registrado y auditado.", icon="✅")
+                
+                # 3. Presentación Visual del Éxito
+                if nuevo_estatus == "LIQUIDADO":
+                    st.balloons()
+                    dictamen("exito", "¡CRÉDITO LIQUIDADO EN SU TOTALIDAD!", f"El deudor **{datos_deudor.get('cliente')}** ha cubierto el 100% de su saldo insoluto. El pagaré mercantil queda liberado y su estatus cambió a **LIQUIDADO**.")
+                    st.info(f"Se devengaron **${interes_cobrado:,.2f}** de interés, los cuales han sido dispersados automáticamente al fondo de socios.")
+                else:
+                    dictamen("exito", "Abono Aplicado y Conciliado", f"Se aplicaron **${abono_capital:,.2f}** a reducción de capital. El nuevo saldo exigible de **{datos_deudor.get('cliente')}** es de **${nuevo_saldo_real:,.2f} MXN**.")
+                    st.info(f"**Conciliación de Rendimientos:** Se devengaron **${interes_cobrado:,.2f}** de interés puro en este periodo. Este flujo se ha inyectado a la Bolsa de Dividendos del Cap Table.\n\n📅 Próximo vencimiento rodado al: **{nueva_fecha_venc}**.")
                 
             except Exception as e:
-                st.error(f"Error en la transacción bancaria: {str(e)}")
+                st.error(f"Error crítico en la transacción SQL: {str(e)}")
 else:
     st.info("Seleccione un expediente en la parte superior para habilitar la ventanilla de cobro.")
