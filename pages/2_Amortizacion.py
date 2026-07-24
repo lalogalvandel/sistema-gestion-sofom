@@ -107,7 +107,7 @@ with col_param:
             plazo_quincenas = 12
             fecha_desembolso = datetime.today()
             
-        calcular = st.form_submit_button("Calculadora de Amortización Exacta", use_container_width=True)
+        calcular = st.form_submit_button("Calculadora de Amortización Exacta", width='stretch')
 
 with col_resumen:
     titulo_seccion("balanza", "2. Dictamen Matemático y Contable")

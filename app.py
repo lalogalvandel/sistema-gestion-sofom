@@ -152,4 +152,4 @@ with col_right:
     fig.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='#FFFFFF', width=2)))
     fig = plantilla_plotly(fig, altura=240, leyenda=False)
     
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')

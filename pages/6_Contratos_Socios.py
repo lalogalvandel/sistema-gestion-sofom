@@ -192,7 +192,7 @@ else:
         vigencia_meses = st.number_input("Vigencia del Contrato Mercantil (Meses):", min_value=1, value=12, step=1)
         
         st.markdown("<br>", unsafe_allow_html=True)
-        generar_doc = st.form_submit_button("Compilar Contrato Formal en PDF", use_container_width=True)
+        generar_doc = st.form_submit_button("Compilar Contrato Formal en PDF", width='stretch')
         
         if generar_doc:
             with st.spinner("Construyendo instrumento legal de inversión..."):
@@ -224,7 +224,7 @@ if "pdf_contrato_socio" in st.session_state and not df_cap_table.empty:
             file_name=f"Contrato_Asociacion_{datos_s['rfc']}.pdf",
             mime="application/pdf",
             type="primary",
-            use_container_width=True
+            width='stretch'
         )
     with d_col2:
         st.markdown("*Cotejo Normativo:* Este documento integra las declaraciones obligatorias de prevención de lavado de dinero y la cláusula de exclusión de sociedad laboral. Debe imprimirse en duplicado para firmas físicas.")

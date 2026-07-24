@@ -130,7 +130,7 @@ else:
         st.markdown("**Distribución del Capital por Buckets de Antigüedad ($)**")
         resumen_buckets = df_cartera.groupby("Bucket")["saldo_pendiente"].sum().reset_index()
         resumen_buckets.columns = ["Bucket", "Saldo Monto ($)"]
-        st.bar_chart(data=resumen_buckets, x="Bucket", y="Saldo Monto ($)", use_container_width=True)
+        st.bar_chart(data=resumen_buckets, x="Bucket", y="Saldo Monto ($)", width='stretch')
         
     with col_tabla:
         st.markdown("**Concentración de Riesgo por Etapa**")
@@ -139,7 +139,7 @@ else:
             Saldo_Total=('saldo_pendiente', 'sum')
         ).reset_index()
         resumen_tabla["Concentración (%)"] = round((resumen_tabla["Saldo_Total"] / cartera_total) * 100, 2)
-        st.dataframe(resumen_tabla, use_container_width=True, hide_index=True)
+        st.dataframe(resumen_tabla, width='stretch', hide_index=True)
 
 st.divider()
 
@@ -164,7 +164,7 @@ with col_calc1:
         prob_default = st.slider("Probabilidad de Default Estimada (Pd %):", min_value=0.0, max_value=25.0, value=5.0, step=0.5) / 100.0
         
         st.markdown("<br>", unsafe_allow_html=True)
-        calcular_tasa = st.form_submit_button("Calcular Tasa de Indiferencia", use_container_width=True)
+        calcular_tasa = st.form_submit_button("Calcular Tasa de Indiferencia", width='stretch')
 
 with col_calc2:
     if calcular_tasa:
@@ -228,7 +228,7 @@ with col_bitacora:
         notas_gestion = st.text_area("Declaraciones y Extracto de la Gestión:", placeholder="El acreditado manifiesta retraso por insolvencia temporal. Suscribe compromiso de liquidación parcial en la fecha estipulada.", disabled=es_auditor_solo_lectura)
         
         st.markdown("<br>", unsafe_allow_html=True)
-        guardar_bitacora = st.form_submit_button("Anexar Gestión al Expediente", use_container_width=True, disabled=es_auditor_solo_lectura)
+        guardar_bitacora = st.form_submit_button("Anexar Gestión al Expediente", width='stretch', disabled=es_auditor_solo_lectura)
         
         if guardar_bitacora and not es_auditor_solo_lectura:
             if not id_credito_ref or not notas_gestion:
@@ -257,7 +257,7 @@ with col_historial:
             df_bit = pd.DataFrame(res_bit.data)
             df_bit_presentacion = df_bit[["fecha_registro", "id_credito_ref", "tipo_accion", "usuario_gestor"]].copy()
             df_bit_presentacion.columns = ["Fecha UTC", "Referencia", "Intervención", "Gestor Firmante"]
-            st.dataframe(df_bit_presentacion, use_container_width=True)
+            st.dataframe(df_bit_presentacion, width='stretch')
         else:
             st.info("No existen registros de intervención extrajudicial en el historial reciente.")
     except Exception:

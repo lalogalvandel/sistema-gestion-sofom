@@ -175,7 +175,7 @@ with st.form("form_evaluacion_crediticia"):
         st.caption("Nota de Auditoría: El parámetro seleccionado en esta casilla debe coincidir de forma estricta con la clave MOP o comportamiento reflejado en el documento PDF adjuntado en la Sección 1.")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    ejecutar_evaluacion = st.form_submit_button("Ejecutar Motor de Inteligencia y Calcular Tasa", use_container_width=True)
+    ejecutar_evaluacion = st.form_submit_button("Ejecutar Motor de Inteligencia y Calcular Tasa", width='stretch')
 
 # -----------------------------------------------------------------------------
 # 4. PROCESAMIENTO ALGORÍTMICO Y DICTAMEN DE RIESGO (CON MEMORIA DE SESIÓN)

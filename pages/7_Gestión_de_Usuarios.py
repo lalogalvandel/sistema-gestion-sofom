@@ -50,7 +50,7 @@ with col_operaciones:
             new_pwd = st.text_input("Contraseña Temporal:", type="password")
             new_rol = st.selectbox("Rol Institucional:", ["COBRANZA", "AUDITOR", "ADMIN"])
             
-            btn_crear = st.form_submit_button("Crear Usuario y Encriptar", use_container_width=True)
+            btn_crear = st.form_submit_button("Crear Usuario y Encriptar", width='stretch')
             
             if btn_crear:
                 if not new_email or len(new_pwd) < 6:
@@ -79,7 +79,7 @@ with col_operaciones:
                 email_a_resetear = st.selectbox("Seleccione el Usuario a Modificar:", options=df_usr["email"].tolist())
                 pwd_temp = st.text_input("Nueva Contraseña Temporal:", type="password", placeholder="Mínimo 6 caracteres")
                 
-                btn_reset = st.form_submit_button("Sobreescribir Contraseña", use_container_width=True)
+                btn_reset = st.form_submit_button("Sobreescribir Contraseña", width='stretch')
                 
                 if btn_reset:
                     if len(pwd_temp) < 6:
@@ -101,7 +101,7 @@ with col_operaciones:
 with col_directorio:
     titulo_seccion("documento_check", "2. Directorio de Personal Activo")
     if not df_usr.empty:
-        st.dataframe(df_usr[["email", "rol"]], use_container_width=True)
+        st.dataframe(df_usr[["email", "rol"]], width='stretch')
         st.caption("Nota: Por protocolos de seguridad institucional de la SOFOM, las contraseñas no se muestran en pantalla ni se almacenan en texto plano en la base de datos.")
     else:
         st.info("No hay usuarios registrados en el sistema.")

@@ -30,7 +30,7 @@ with st.form("form_login_institucional"):
     email = st.text_input("Correo Electrónico Institucional:", placeholder="usuario@sofom.com")
     pwd = st.text_input("Contraseña de Acceso:", type="password")
     
-    submit = st.form_submit_button("Iniciar Sesión", use_container_width=True)
+    submit = st.form_submit_button("Iniciar Sesión", width='stretch')
 
 if submit:
     if not email or not pwd:
