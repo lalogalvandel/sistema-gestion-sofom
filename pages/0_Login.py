@@ -25,21 +25,7 @@ aplicar_identidad_visual()
 st.markdown("<br><br>", unsafe_allow_html=True)
 st.title("Acceso Institucional SOFOM")
 st.markdown("---")
-# =====================================================================
-# BOTÓN TEMPORAL PARA REPARAR CONTRASEÑAS (BORRAR DESPUÉS DE USAR)
-if st.button("🚨 REPARAR CONTRASEÑAS DE PRUEBA"):
-    try:
-        # Generamos el hash nativo y fresco con TU propia computadora
-        hash_pass = bcrypt.hashpw("admin123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        
-        # Sobrescribimos el password de las cuentas que ya existen
-        supabase.table("usuarios").update({"password": hash_pass}).eq("email", "auditor@sofom.com").execute()
-        supabase.table("usuarios").update({"password": hash_pass}).eq("email", "cobranza@sofom.com").execute()
-        
-        st.success("✅ ¡Contraseñas actualizadas con la encriptación correcta de tu servidor! Ya puedes iniciar sesión y borrar este botón.")
-    except Exception as e:
-        st.error(f"Fallo al actualizar: {str(e)}")
-# =====================================================================
+
 with st.form("form_login_institucional"):
     email = st.text_input("Correo Electrónico Institucional:", placeholder="usuario@sofom.com")
     pwd = st.text_input("Contraseña de Acceso:", type="password")
