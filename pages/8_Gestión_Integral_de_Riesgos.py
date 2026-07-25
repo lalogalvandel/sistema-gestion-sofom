@@ -201,7 +201,7 @@ with col_calc2:
             
             c_res1, c_res2 = st.columns(2)
             with c_res1: st.metric(label="Tasa Mínima Anual", value=f"{tasa_anual_optima:.2f}%")
-            with c_res2: st.metric(label="Tasa Óptima Mensual", value=f"{(tasa_anual_optima / 12.0)::.2f}%")
+            with c_res2: st.metric(label="Tasa Óptima Mensual", value=f"{(tasa_anual_optima / 12.0):.2f}%")
             
             st.info("Esta es la tasa piso. Originar por debajo de este umbral destruirá capital del fondo.")
     else:
