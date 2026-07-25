@@ -1,43 +1,65 @@
-# 
-# Copyright (c) 2026 Eduardo Galván del Rio. Todos los derechos reservados.
+# =============================================================================
+# Copyright (c) 2026 Eduardo Galván del Río. Todos los derechos reservados.
 # 
 # Este código fuente es propiedad exclusiva y confidencial. Queda estrictamente
 # prohibida su reproducción, distribución, comercialización o modificación
 # sin autorización expresa y por escrito del autor.
-# 
+# =============================================================================
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from src.db import supabase, formalizar_credito_y_amortización
+from src.db import supabase
+from src.auth import verificar_acceso
 from src.theme import (
     aplicar_identidad_visual, encabezado_modulo, titulo_seccion,
-    dictamen, tarjeta_kpi
+    dictamen
 )
 
 st.set_page_config(page_title="Amortización y Formalización | SOFOM", layout="wide")
-from src.auth import verificar_acceso
+
+# --- BLINDAJE INSTITUCIONAL RBAC ---
 verificar_acceso("COBRANZA")
-# 1. Inyectar identidad visual
+# -----------------------------------
+
 aplicar_identidad_visual()
 
+# --- EL RIESGO ESTÉTICO (SIGNATURE DESIGN) ---
+# Mantenemos la coherencia visual con el módulo de Riesgos: 
+# Tipografía Monospace para la data financiera dura.
+st.markdown("""
+<style>
+    [data-testid="stMetricValue"], .stDataFrame {
+        font-family: 'JetBrains Mono', 'Courier New', monospace !important;
+        letter-spacing: -0.5px;
+    }
+    [data-testid="metric-container"] {
+        border-radius: 2px !important;
+        border-left: 4px solid #1e293b !important; 
+        padding-left: 15px !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 encabezado_modulo(
-    titulo="Motor de Amortización y Formalización",
-    subtitulo="Generación de calendarios bajo el Sistema Francés y registro transaccional en PostgreSQL.",
+    titulo="Motor de Amortización y Estructuración",
+    subtitulo="Generación de corridas financieras bajo el Sistema Francés y transición a la mesa jurídica.",
     nombre_icono="calendario",
-    insignia="SISTEMA FRANCÉS"
+    insignia="OPERACIONES FINANCIERAS"
 )
 
+# -----------------------------------------------------------------------------
+# 1. LECTURA DE CARTERA APROBADA
+# -----------------------------------------------------------------------------
 @st.cache_data(ttl=15)
 def obtener_clientes_aprobados():
     try:
-        # 1. SOLO leemos de la tabla 'prestamos' los créditos que el Módulo 1 acaba de dejar como APROBADO
         res = supabase.table("prestamos").select("*").in_("estatus", ["APROBADO", "APROBADO PREFERENCIAL", "APROBADO CONDICIONADO"]).order("fecha_otorgamiento", desc=True).execute()
         
         if not res.data:
             return []
             
-        # 2. Mapeamos las columnas exactas para que el selector no falle
         clientes_formateados = []
         for p in res.data:
             clientes_formateados.append({
@@ -63,8 +85,11 @@ for c in clientes_db:
 
 col_param, col_resumen = st.columns([1, 1.4])
 
+# -----------------------------------------------------------------------------
+# 2. PARÁMETROS DEL CRÉDITO
+# -----------------------------------------------------------------------------
 with col_param:
-    titulo_seccion("personas", "1. Parámetros del Crédito")
+    titulo_seccion("personas", "PARÁMETROS DE ESTRUCTURACIÓN")
     
     index_defecto = 0
     if "expediente_activo" in st.session_state and st.session_state["expediente_activo"]:
@@ -74,7 +99,7 @@ with col_param:
                 index_defecto = i
                 break
 
-    seleccion = st.selectbox("Expediente en Evaluación:", options=opciones_selector, index=index_defecto)
+    seleccion = st.selectbox("Expediente Aprobado:", options=opciones_selector, index=index_defecto)
     
     with st.form("form_parametros_credito"):
         if seleccion != "-- Seleccione un Deudor Aprobado --":
@@ -83,37 +108,39 @@ with col_param:
             nombre_mostrar = cliente_sel["nombre_completo"]
             rfc_mostrar = cliente_sel["rfc"]
             
-            # Tomamos los valores directos que vienen de la base de datos de colocación
             monto_init = float(cliente_sel.get("monto_aprobado", 15000.0))
-            
-            # Ajustamos la tasa por si viene en decimal (0.015) o en porcentaje directo (1.5)
             val_tasa = float(cliente_sel.get("tasa_mensual", 6.0))
             tasa_init = val_tasa if val_tasa > 1.0 else round(val_tasa * 100.0, 2)
+            
             if "expediente_activo" in st.session_state and st.session_state["expediente_activo"].get("id_cliente") == id_cliente:
                 monto_init = float(st.session_state["expediente_activo"].get("monto_aprobado", 15000.0))
                 tasa_init = float(st.session_state["expediente_activo"].get("tasa_mensual", 0.06)) * 100.0
                 
-            st.text_input("Nombre del Deudor:", value=nombre_mostrar, disabled=True)
-            st.text_input("RFC / ID Institucional:", value=f"{rfc_mostrar} | {id_cliente}", disabled=True)
-            monto_principal = st.number_input("Monto a Otorgar ($):", min_value=1000.0, max_value=150000.0, value=monto_init, step=1000.0)
-            tasa_mensual = st.number_input("Tasa de Interés Mensual (%):", min_value=1.0, max_value=15.0, value=tasa_init, step=0.5) / 100.0
-            plazo_quincenas = st.selectbox("Número de Quincenas:", options=[6, 12, 18, 24], index=1)
-            fecha_desembolso = st.date_input("Fecha Programada de Desembolso:", value=datetime.today())
+            st.text_input("Acreditado Titular:", value=nombre_mostrar, disabled=True)
+            st.text_input("RFC Institucional:", value=f"{rfc_mostrar} | {id_cliente}", disabled=True)
+            monto_principal = st.number_input("Monto Principal ($):", min_value=1000.0, max_value=150000.0, value=monto_init, step=1000.0)
+            tasa_mensual = st.number_input("Tasa Ordinaria Mensual (%):", min_value=1.0, max_value=15.0, value=tasa_init, step=0.5) / 100.0
+            plazo_quincenas = st.selectbox("Plazo de Amortización (Quincenas):", options=[6, 12, 18, 24], index=1)
+            fecha_desembolso = st.date_input("Fecha Base de Desembolso:", value=datetime.today())
         else:
             id_cliente = None
-            st.info("Seleccione un expediente en el listado superior para habilitar los parámetros de cálculo.")
-            monto_principal = st.number_input("Monto a Otorgar ($):", value=0.0, disabled=True)
+            st.info("Seleccione un expediente en la parte superior para calibrar la estructuración.")
+            monto_principal = st.number_input("Monto Principal ($):", value=0.0, disabled=True)
             tasa_mensual = 0.0
             plazo_quincenas = 12
             fecha_desembolso = datetime.today()
             
-        calcular = st.form_submit_button("Calculadora de Amortización Exacta", width='stretch')
+        # Call-to-action activo
+        calcular = st.form_submit_button("Proyectar Corrida Financiera", width='stretch')
 
+# -----------------------------------------------------------------------------
+# 3. DICTAMEN MATEMÁTICO (KPIs INSTITUCIONALES)
+# -----------------------------------------------------------------------------
 with col_resumen:
-    titulo_seccion("balanza", "2. Dictamen Matemático y Contable")
+    titulo_seccion("balanza", "CONCILIACIÓN MATEMÁTICA")
     
     if seleccion == "-- Seleccione un Deudor Aprobado --":
-        dictamen("alerta", "Selección Pendiente", "Debe seleccionar un cliente aprobado en el menú desplegable para generar la tabla de amortización y proceder a la formalización contractual.")
+        st.info("El dictamen contable se generará automáticamente tras proyectar la corrida financiera.")
     else:
         tasa_quincenal = tasa_mensual / 2.0
         
@@ -123,13 +150,11 @@ with col_resumen:
             cuota_teorica = monto_principal / plazo_quincenas
             
         cuota_fija = round(cuota_teorica, 2)
-        
         saldo = round(float(monto_principal), 2)
         fecha_iter = datetime.combine(fecha_desembolso, datetime.min.time())
         
         tabla_pagos = []
-        total_interes = 0.0
-        total_capital = 0.0
+        total_interes, total_capital = 0.0, 0.0
         
         for q in range(1, plazo_quincenas + 1):
             fecha_iter += timedelta(days=15)
@@ -148,39 +173,34 @@ with col_resumen:
             total_capital = round(total_capital + abono_capital, 2)
             
             tabla_pagos.append({
-                "No. Quincena": q,
-                "Fecha de Vencimiento": fecha_iter.strftime("%Y-%m-%d"),
-                "Saldo Inicial ($)": f"{round(saldo + abono_capital, 2):,.2f}",
-                "Cuota Fija ($)": f"{cuota_real:,.2f}",
-                "Interés Cobrado ($)": f"{interes_quincena:,.2f}",
-                "Abono a Capital ($)": f"{abono_capital:,.2f}",
-                "Saldo Insoluto ($)": f"{saldo:,.2f}"
+                "No.": q,
+                "Vencimiento": fecha_iter.strftime("%Y-%m-%d"),
+                "Saldo Inicial": f"${round(saldo + abono_capital, 2):,.2f}",
+                "Cuota Fija": f"${cuota_real:,.2f}",
+                "Interés": f"${interes_quincena:,.2f}",
+                "Abono Capital": f"${abono_capital:,.2f}",
+                "Saldo Insoluto": f"${saldo:,.2f}"
             })
             
         df_amortizacion = pd.DataFrame(tabla_pagos)
         total_recaudar = round(total_capital + total_interes, 2)
         
-        # Cuadrícula simétrica 2x2 con tarjetas KPI institucionales
+        # Uso de st.metric puro para heredar el CSS Monospace
         m1, m2 = st.columns(2)
-        with m1:
-            tarjeta_kpi("billetera", "Capital Otorgado", f"${total_capital:,.2f}", "Monto original del desembolso", "marino_800")
-        with m2:
-            tarjeta_kpi("porcentaje", "Interés Total Proyectado", f"${total_interes:,.2f}", "Costo financiero a lo largo del plazo", "dorado_600")
+        with m1: st.metric(label="Capital a Financiar", value=f"${total_capital:,.2f}")
+        with m2: st.metric(label="Costo Financiero (Interés)", value=f"${total_interes:,.2f}")
             
         st.markdown("<br>", unsafe_allow_html=True)
-        
         m3, m4 = st.columns(2)
-        with m3:
-            tarjeta_kpi("banco", "Monto Total a Recaudar", f"${total_recaudar:,.2f}", "Suma exacta del pagaré ejecutivo", "azul_600")
-        with m4:
-            tarjeta_kpi("calendario", "Cuota Quincenal Base", f"${cuota_fija:,.2f}", "Pago recurrente constante", "verde_lago")
+        with m3: st.metric(label="Obligación Total a Exigir", value=f"${total_recaudar:,.2f}")
+        with m4: st.metric(label="Cuota Quincenal Nivelada", value=f"${cuota_fija:,.2f}")
         
         st.markdown("---")
         
         if total_capital == round(monto_principal, 2):
-            dictamen("exito", "Verificación Contable Exitosa", "Conciliación de capital exacta bajo el Sistema Francés. Saldo insoluto al cierre liquidado matemáticamente a $0.00.")
+            dictamen("exito", "Cuadratura Exacta", "Sistema Francés validado. Saldo insoluto liquidado a $0.00 en la última iteración.")
         else:
-            dictamen("peligro", "Discrepancia Contable", "Se ha detectado una diferencia en el redondeo de centavos del capital. Revise las tasas aplicadas.")
+            dictamen("peligro", "Discrepancia Detectada", "Error de redondeo de capital. Revise los parámetros.")
             
         st.session_state["credito_calculado"] = {
             "id_cliente": id_cliente,
@@ -196,28 +216,29 @@ with col_resumen:
 
 st.divider()
 
-titulo_seccion("documento", "3. Calendario Detallado de Obligaciones (Anexo al Contrato)")
-
-titulo_seccion("documento", "3. Calendario Detallado y Paso a Jurídico")
+# -----------------------------------------------------------------------------
+# 4. TABLA DE AMORTIZACIÓN Y ACCIONES JURÍDICAS (Se eliminó el doble título)
+# -----------------------------------------------------------------------------
+titulo_seccion("documento", "ANEXO CONTABLE Y PASE A JURÍDICO")
 
 if "credito_calculado" in st.session_state and st.session_state["credito_calculado"]:
     df_mostrar = st.session_state["credito_calculado"]["tabla_df"]
-    st.dataframe(df_mostrar, width="stretch")
+    st.dataframe(df_mostrar, width="stretch", hide_index=True)
     
     col_acc1, col_acc2 = st.columns([1, 1.2])
     with col_acc1:
         csv_export = df_mostrar.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Descargar Anexo Contable (CSV)",
+            label="📥 Descargar Anexo CSV",
             data=csv_export,
             file_name="tabla_amortizacion_legal.csv",
             mime="text/csv",
             width="stretch"
         )
     with col_acc2:
-        # BOTÓN INSTITUCIONAL CORRECTO: No formaliza, solo guarda el calendario y avanza el estatus
-        if st.button("Guardar Calendario y Turnar a Jurídico", type="primary", width="stretch"):
-            with st.spinner("Inscribiendo tabla de amortización en el servidor y turnando expediente..."):
+        # Voz activa: Instrucción clara de lo que hace el botón
+        if st.button("Consolidar Expediente y Turnar a Mesa Legal", type="primary", width="stretch"):
+            with st.spinner("Inscribiendo tabla de amortización y estructurando operación..."):
                 datos_c = st.session_state["credito_calculado"]
                 try:
                     target_id = str(datos_c["id_cliente"]).strip()
@@ -227,25 +248,22 @@ if "credito_calculado" in st.session_state and st.session_state["credito_calcula
                         "cuota_fija_proyectada": float(datos_c["cuota_fija_proyectada"]),
                         "monto_total_recaudar": float(datos_c["monto_total_recaudar"]),
                         "fecha_desembolso": datos_c["fecha_desembolso"],
-                        "estatus": "ESTRUCTURADO"  # <--- LA CLAVE: Avanza al paso 2 del pipeline
+                        "estatus": "ESTRUCTURADO"  # Avanza al pipeline
                     }
                     
-                    # 1. Intentamos actualizar buscando por RFC (que es el ID que viene del Módulo 1)
                     res_upd = supabase.table("prestamos").update(payload_actualizacion).eq("rfc", target_id).execute()
-                    
-                    # 2. Si por algo no hizo match con rfc, intentamos buscando por id_cliente o por cliente
                     if not res_upd.data:
                         res_upd = supabase.table("prestamos").update(payload_actualizacion).eq("id_cliente", target_id).execute()
                     if not res_upd.data:
                         res_upd = supabase.table("prestamos").update(payload_actualizacion).eq("cliente", target_id).execute()
                     
-                    dictamen("exito", "Estructuración Contable Completa", "El calendario bajo Sistema Francés se ha enlazado al expediente del cliente. El estatus del crédito ha cambiado oficialmente a **ESTRUCTURADO**.")
-                    st.info("**Siguiente paso del pipeline:** Ve a la pestaña **4. Contratos y Legal**. El acreditado ya te espera en la lista jurídica para emitir su Pagaré Mercantil y firmar el contrato.")
+                    dictamen("exito", "Estructuración Contable Completa", "El calendario de pagos se enlazó con éxito. El expediente cambió a estatus ESTRUCTURADO.")
+                    st.info("**Siguiente paso:** Proceda al módulo de 'Contratos y Legal' para emitir el Pagaré Mercantil.")
                     
-                    # Limpiamos la memoria de la calculadora para el siguiente expediente
                     del st.session_state["credito_calculado"]
                     
                 except Exception as e:
-                    dictamen("peligro", "Error en Transacción", f"No se pudo completar la actualización contable en el servidor: {str(e)}")
+                    dictamen("peligro", "Fallo de Servidor", f"No se pudo completar la actualización: {str(e)}")
 else:
-    st.info("Configure los parámetros y presione el botón de cálculo para visualizar el calendario formal.")
+    # Estado vacío activo
+    st.info("Proyecte la corrida financiera en el panel superior para habilitar el anexo contable y las acciones legales.")
