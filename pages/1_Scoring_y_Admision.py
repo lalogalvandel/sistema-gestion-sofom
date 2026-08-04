@@ -1,10 +1,11 @@
-# 
+# =============================================================================
 # Copyright (c) 2026 Eduardo Galván del Rio. Todos los derechos reservados.
 # 
 # Este código fuente es propiedad exclusiva y confidencial. Queda estrictamente
 # prohibida su reproducción, distribución, comercialización o modificación
 # sin autorización expresa y por escrito del autor.
-# 
+# =============================================================================
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -26,9 +27,19 @@ verificar_acceso("COBRANZA")
 
 aplicar_identidad_visual()
 
+# --- FIRMA VISUAL (SIGNATURE) ---
+st.markdown("""
+<style>
+    [data-testid="stMetricValue"], .stDataFrame {
+        font-family: 'JetBrains Mono', 'Courier New', monospace !important;
+        letter-spacing: -0.5px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 encabezado_modulo(
-    titulo="Motor Actuarial de Admisión y Credit Scoring",
-    subtitulo="Evaluación algorítmica de riesgo crediticio, verificación legal KYC/PLD, fijación de Tasa de Indiferencia y formalización de colocación.",
+    titulo="Motor Actuarial y Originación KYC",
+    subtitulo="Evaluación de riesgo, verificación PLD estricta e inscripción en el ecosistema relacional.",
     nombre_icono="escudo",
     insignia="ORIGINACIÓN INSTITUCIONAL"
 )
@@ -37,7 +48,7 @@ usuario_actual = st.session_state.get("user_email", "Usuario No Identificado")
 rol_actual = st.session_state.get("user_role", "COBRANZA")
 
 # -----------------------------------------------------------------------------
-# 1. MOTOR DE MACHINE LEARNING: REGRESIÓN LOGÍSTICA CALIBRADA
+# 1. MOTOR DE MACHINE LEARNING (A futuro se entrenará con BD Real)
 # -----------------------------------------------------------------------------
 @st.cache_resource
 def inicializar_motor_scoring():
@@ -72,155 +83,101 @@ def inicializar_motor_scoring():
 modelo_scoring, escalador_features = inicializar_motor_scoring()
 
 # -----------------------------------------------------------------------------
-# 2. BÓVEDA DIGITAL, ASISTENTE DE DECISIÓN SIC Y CONSENTIMIENTO
+# 2. BÓVEDA DIGITAL Y ASISTENTE KYC
 # -----------------------------------------------------------------------------
-titulo_seccion("documento", "1. Bóveda Digital, Asistente de Decisión y Consentimiento Legal")
+titulo_seccion("documento", "ASISTENTE DE DECISIÓN SIC Y BÓVEDA KYC")
 
-st.markdown(f"**Funcionario Evaluador en Sesión:** `{usuario_actual}` ({rol_actual})")
+st.markdown(f"**Oficial de Crédito / Evaluador:** `{usuario_actual}`")
 
-# -- ASISTENTE INTERACTIVO DE DECISIÓN SIC --
-st.markdown("**Matriz de Decisión Institucional: ¿Qué documento solicitar al cliente?**")
-perfil_cliente = st.selectbox(
-    "Seleccione el perfil financiero o laboral principal del solicitante:",
-    [
-        "A) Asalariado formal, profesionista o empresa con nómina en Bancos Tradicionales (BBVA, Banorte, Banamex, Santander, etc.)",
-        "B) Comerciante, trabajador independiente, o usuario de FinTechs (Nu, Mercado Pago), Tiendas Retail (Coppel, Elektra) y Microcréditos",
-        "C) Perfil mixto, economía informal o sin historial bancario identificable"
-    ]
-)
-
-if perfil_cliente.startswith("A)"):
-    st.info("**Instrucción Institucional:** El perfil bancario tradicional concentra su historial en **BURÓ DE CRÉDITO**. Solicite al cliente que descargue su Reporte de Crédito Especial gratuito en el siguiente enlace oficial: [www.burodecredito.com.mx](https://www.burodecredito.com.mx)")
-elif perfil_cliente.startswith("B)"):
-    st.info("**Instrucción Institucional:** El ecosistema FinTech, comercial y microfinanciero reporta prioritariamente a **CÍRCULO DE CRÉDITO**. Solicite al cliente su reporte gratuito en el siguiente enlace oficial: [www.circulodecredito.com.mx](https://www.circulodecredito.com.mx)")
-else:
-    st.info("**Instrucción Institucional:** Para perfiles de la economía informal o sin historial bancario, **prescinda de la consulta crediticia** y solicite estrictamente los **Últimos 3 Estados de Cuenta Bancarios (PDF)** para evaluar liquidez real y flujo de caja.")
-
-# -- GUÍA DE LECTURA RÁPIDA (ACORDEÓN DESPLEGABLE) --
-with st.expander("Ayuda Operativa: Guía de Lectura Rápida de PDF (Traducción de Códigos MOP)"):
+with st.expander("Matriz Institucional de Consulta SIC (Buró vs Círculo)"):
     st.markdown("""
-    Al abrir el documento PDF del cliente, localice la sección de **Historial de Pagos** y busque la clave de comportamiento (**MOP** o semáforo). Utilice la siguiente tabla de conversión para llenar el formulario inferior:
-    
-    * **MOP 01 (Cuenta al corriente / Sin atrasos):** Asigne el valor **0** en el modelo.
-    * **MOP 02 (Atraso de 1 a 29 días):** Asigne el valor **1 (Atraso leve)** en el modelo.
-    * **MOP 03 (Atraso de 30 a 59 días):** Asigne el valor **2 (Atraso moderado)** en el modelo.
-    * **MOP 04, 05, 99 o Cuenta en Cobranza Judicial:** Asigne el valor **3 (Atraso severo / marca negativa)** en el modelo.
-    * *Si evalúa con Estados de Cuenta Bancarios y no hay sobregiros ni rebotes:* Asigne el valor **0**.
+    * **Perfil Bancarizado (Nómina, Tarjetas Clásicas):** Consulte **Buró de Crédito**.
+    * **Perfil FinTech / Retail (Nu, Elektra, Coppel):** Consulte **Círculo de Crédito**.
+    * **Economía Informal:** Solicite Últimos 3 Estados de Cuenta Bancarios.
     """)
-
-st.markdown("---")
 
 col_doc1, col_doc2 = st.columns([1, 1.2])
 
 with col_doc1:
-    st.markdown("**Carga de Expediente Digital (PDF obligatorio):**")
-    archivo_kyc = st.file_uploader("Adjuntar Reporte Crediticio o Estados de Cuenta (PDF):", type=["pdf"])
+    archivo_kyc = st.file_uploader("Adjuntar Expediente (PDF / ZIP con Documentación):", type=["pdf", "zip"])
 
 with col_doc2:
-    st.markdown("**Validación Jurídica de Consentimiento (Innegociable):**")
-    declaracion_legal = st.checkbox(
-        "**Declaración Legal de Consentimiento y Veracidad (Art. 28 LRSIC y Disposiciones PLD):**\n"
-        "Bajo protesta de decir verdad, el solicitante declara que el documento digital adjunto fue obtenido por su propia cuenta de manera legítima y lo otorga voluntariamente a la SOFOM para el análisis y evaluación de su solvencia crediticia. Asimismo, autoriza expresamente a la entidad para realizar consultas y reportes periódicos a las Sociedades de Información Crediticia durante la vigencia de la relación comercial."
-    )
+    st.markdown("**Validación Jurídica (Art. 28 LRSIC):**")
+    declaracion_legal = st.checkbox("El solicitante autoriza expresamente la consulta de su historial crediticio y declara el origen lícito de sus recursos (PLD).")
 
 st.divider()
 
 # -----------------------------------------------------------------------------
-# 3. CAPTURA DE PARAMÉTRICOS Y EVALUACIÓN FINANCIERA
+# 3. PARAMÉTRICOS FINANCIEROS Y ESTRUCTURA DE CRÉDITO
 # -----------------------------------------------------------------------------
-titulo_seccion("personas", "2. Expediente Paramétrico y Perfil Financiero")
+titulo_seccion("personas", "PERFIL FINANCIERO Y ESTRUCTURA DEL CRÉDITO")
 
 with st.form("form_evaluacion_crediticia"):
-    st.markdown("**Datos Generales del Solicitante**")
-    c_gen1, c_gen2, c_gen3 = st.columns(3)
+    c_gen1, c_gen2 = st.columns(2)
     with c_gen1:
-        nombre_cliente = st.text_input("Nombre o Razón Social:", placeholder="Ej: Fernando Gómez Morales")
+        nombre_cliente = st.text_input("Acreditado Titular (Nombre Completo):")
     with c_gen2:
-        rfc_cliente = st.text_input("RFC con Homoclave:", placeholder="Ej: GOMF850315XXX").upper()
-    with c_gen3:
-        tipo_solicitante = st.selectbox("Clasificación de Persona:", ["Persona Física con Actividad Empresarial", "Persona Moral", "Asalariado / Nómina"])
+        rfc_cliente = st.text_input("RFC con Homoclave (ID Único):").upper()
         
     st.markdown("---")
-    st.markdown("**Estructura del Crédito Solicitado**")
-    c_cred1, c_cred2, c_cred3 = st.columns(3)
+    c_cred1, c_cred2 = st.columns(2)
     with c_cred1:
-        monto_solicitado = st.number_input("Capital Solicitado ($ MXN):", min_value=1000.0, max_value=5000000.0, value=50000.0, step=5000.0)
+        monto_solicitado = st.number_input("Capital Solicitado ($ MXN):", min_value=1000.0, value=50000.0, step=5000.0)
     with c_cred2:
-        plazo_meses = st.number_input("Plazo de Amortización (Meses):", min_value=1, max_value=60, value=12, step=1)
-    with c_cred3:
-        frecuencia_pago = st.selectbox("Periodicidad de Amortización:", ["Quincenal", "Mensual"])
+        # UNIFICACIÓN DE NOMENCLATURA: Usamos Quincenas para que cruce perfecto con Amortización
+        plazo_quincenas = st.selectbox("Plazo Requerido (Quincenas):", [6, 12, 18, 24, 36, 48], index=1)
         
     st.markdown("---")
-    st.markdown("**Variables Económicas para Evaluación Actuarial**")
     c_var1, c_var2, c_var3, c_var4 = st.columns(4)
-    with c_var1:
-        ingreso_mensual = st.number_input("Ingreso Bruto Mensual ($):", min_value=0.0, value=35000.0, step=1000.0)
-    with c_var2:
-        gastos_fijos = st.number_input("Gastos y Deudas Mensuales ($):", min_value=0.0, value=15000.0, step=1000.0)
-    with c_var3:
-        antiguedad_anios = st.number_input("Antigüedad Laboral / Negocio (Años):", min_value=0.1, max_value=50.0, value=3.0, step=0.5)
-    with c_var4:
-        patrimonio_garantia = st.number_input("Patrimonio Neto o Garantía ($):", min_value=1.0, value=100000.0, step=10000.0)
+    with c_var1: ingreso_mensual = st.number_input("Ingreso Neto Mensual ($):", min_value=0.0, value=35000.0)
+    with c_var2: gastos_fijos = st.number_input("Obligaciones Mensuales ($):", min_value=0.0, value=15000.0)
+    with c_var3: antiguedad_anios = st.number_input("Antigüedad (Años):", min_value=0.1, value=3.0)
+    with c_var4: patrimonio_garantia = st.number_input("Patrimonio / Garantía ($):", min_value=1.0, value=100000.0)
         
     c_mora1, c_mora2 = st.columns([1, 2])
     with c_mora1:
-        mora_buro = st.selectbox("Clasificación de Historial en Buró de Crédito (Acreditado en PDF):", [
-            (0, "0. Sin atrasos reportados en historial (0 días - MOP 01)"),
-            (1, "1. Atraso leve histórico (1 a 30 días - MOP 02)"),
-            (2, "2. Atraso moderado histórico (31 a 60 días - MOP 03)"),
-            (3, "3. Atraso severo o marca negativa (> 60 días - MOP 04+)"),
+        mora_buro = st.selectbox("Clave MOP en SIC:", [
+            (0, "0. Al corriente (MOP 01)"),
+            (1, "1. Atraso leve (MOP 02)"),
+            (2, "2. Atraso moderado (MOP 03)"),
+            (3, "3. Marca negativa (MOP 04+)"),
         ], format_func=lambda x: x[1])[0]
     with c_mora2:
         st.markdown("<br>", unsafe_allow_html=True)
-        st.caption("Nota de Auditoría: El parámetro seleccionado en esta casilla debe coincidir de forma estricta con la clave MOP o comportamiento reflejado en el documento PDF adjuntado en la Sección 1.")
+        st.caption("Nota: La clave MOP debe coincidir con el reporte adjunto en la bóveda KYC.")
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    ejecutar_evaluacion = st.form_submit_button("Ejecutar Motor de Inteligencia y Calcular Tasa", width='stretch')
+    ejecutar_evaluacion = st.form_submit_button("Ejecutar Modelo de Scoring Actuarial", width='stretch')
 
 # -----------------------------------------------------------------------------
-# 4. PROCESAMIENTO ALGORÍTMICO Y DICTAMEN DE RIESGO (CON MEMORIA DE SESIÓN)
+# 4. DICTAMEN DE RIESGO
 # -----------------------------------------------------------------------------
 if ejecutar_evaluacion:
     if not archivo_kyc:
-        st.error("BLOQUEO DE AUDITORÍA: No se puede ejecutar el modelo de scoring si no se ha adjuntado el expediente digital (PDF) en la Bóveda de Consentimiento.")
+        st.error("BLOQUEO DE AUDITORÍA: Adjunte el expediente en la Bóveda KYC.")
     elif not declaracion_legal:
-        st.error("BLOQUEO LEGAL: Es indispensable validar la casilla de Declaración Legal de Consentimiento (Art. 28 LRSIC) para procesar la evaluación crediticia.")
+        st.error("BLOQUEO LEGAL: Valide la autorización LRSIC.")
     elif not nombre_cliente or len(rfc_cliente) < 10:
-        st.warning("Debe ingresar la razón social completa y un RFC válido con homoclave para formalizar la evaluación.")
+        st.warning("Ingrese un Nombre y RFC válidos.")
     else:
-        cuota_mensual_estimada = (monto_solicitado / plazo_meses) * 1.06
+        # Cálculo de métricas
+        cuota_mensual_estimada = (monto_solicitado / (plazo_quincenas / 2.0)) * 1.06
         ingreso_disponible = max(ingreso_mensual - gastos_fijos, 0.01)
         ratio_cobertura_calc = round(ingreso_disponible / cuota_mensual_estimada, 2)
         ratio_apalancamiento_calc = round(monto_solicitado / max(patrimonio_garantia, 1.0), 2)
         
-        vector_cliente = pd.DataFrame({
-            "ratio_cobertura": [ratio_cobertura_calc],
-            "antiguedad": [antiguedad_anios],
-            "apalancamiento": [ratio_apalancamiento_calc],
-            "mora_previa": [mora_buro]
-        })
-        
+        # Inferencia ML
+        vector_cliente = pd.DataFrame({"ratio_cobertura": [ratio_cobertura_calc], "antiguedad": [antiguedad_anios], "apalancamiento": [ratio_apalancamiento_calc], "mora_previa": [mora_buro]})
         vector_escalado = escalador_features.transform(vector_cliente)
         prob_default = float(modelo_scoring.predict_proba(vector_escalado)[:, 1][0])
         
-        score_crediticio = int(850 - (prob_default * 550))
-        score_crediticio = max(min(score_crediticio, 850), 300)
+        score_crediticio = max(min(int(850 - (prob_default * 550)), 850), 300)
         
-        costo_capital_anual = 0.12
-        gasto_operativo_anual = 0.04
-        
-        if score_crediticio >= 750:
-            prima_riesgo_anual = 0.02
-            calificacion_grado = "Grado de Inversión Superior (AAA)"
-        elif score_crediticio >= 650:
-            prima_riesgo_anual = 0.04
-            calificacion_grado = "Grado de Inversión Estándar (AA)"
-        elif score_crediticio >= 550:
-            prima_riesgo_anual = 0.08
-            calificacion_grado = "Grado Especulativo Moderado (A)"
-        else:
-            prima_riesgo_anual = 0.15
-            calificacion_grado = "Alto Riesgo de Incumplimiento (B)"
+        # Pricing Risk-Adjusted
+        costo_capital_anual, gasto_operativo_anual = 0.12, 0.04
+        if score_crediticio >= 750: prima_riesgo_anual, calificacion_grado = 0.02, "Grado de Inversión Superior (AAA)"
+        elif score_crediticio >= 650: prima_riesgo_anual, calificacion_grado = 0.04, "Grado de Inversión Estándar (AA)"
+        elif score_crediticio >= 550: prima_riesgo_anual, calificacion_grado = 0.08, "Grado Especulativo Moderado (A)"
+        else: prima_riesgo_anual, calificacion_grado = 0.15, "Alto Riesgo de Incumplimiento (B)"
             
         numerador_tasa = costo_capital_anual + gasto_operativo_anual + prima_riesgo_anual
         denominador_tasa = 1.0 - prob_default
@@ -228,120 +185,101 @@ if ejecutar_evaluacion:
         if denominador_tasa <= 0 or prob_default > 0.22:
             estatus_dictamen = "RECHAZADO"
             tasa_mensual_asignada = 0.0
-            tasa_anual_asignada = 0.0
         else:
-            tasa_anual_asignada = round((numerador_tasa / denominador_tasa) * 100.0, 2)
-            tasa_mensual_asignada = round(tasa_anual_asignada / 12.0, 2)
+            tasa_mensual_asignada = round(((numerador_tasa / denominador_tasa) * 100.0) / 12.0, 2)
             estatus_dictamen = "APROBADO PREFERENCIAL" if score_crediticio >= 700 else "APROBADO CONDICIONADO"
 
-        # GUARDAMOS TODO EN LA MEMORIA DEL NAVEGADOR PARA QUE NO SE BORRE AL PICAR FORMALIZAR
         st.session_state["dictamen_evaluado"] = {
             "nombre_cliente": nombre_cliente,
             "rfc_cliente": rfc_cliente,
+            "ingreso_neto_mensual": ingreso_mensual,
             "monto_solicitado": monto_solicitado,
-            "plazo_meses": plazo_meses,
-            "frecuencia_pago": frecuencia_pago,
+            "plazo_quincenas": plazo_quincenas,
             "score_crediticio": score_crediticio,
             "prob_default": prob_default,
             "ratio_cobertura_calc": ratio_cobertura_calc,
             "tasa_mensual_asignada": tasa_mensual_asignada,
-            "tasa_anual_asignada": tasa_anual_asignada,
             "estatus_dictamen": estatus_dictamen,
             "calificacion_grado": calificacion_grado
         }
 
-# --- SECCIÓN DESACOPLADA: Se renderiza siempre que haya una evaluación en memoria ---
 if "dictamen_evaluado" in st.session_state:
     datos = st.session_state["dictamen_evaluado"]
     
     st.divider()
-    titulo_seccion("estadisticas", "3. Dictamen del Comité Algorítmico y Pricing")
+    titulo_seccion("estadisticas", "DICTAMEN TÉCNICO Y PRICING")
     
     k1, k2, k3, k4 = st.columns(4)
-    with k1:
-        tarjeta_kpi("Score Crediticio", f"{datos['score_crediticio']} pts", datos['calificacion_grado'])
-    with k2:
-        nivel_pd = "BAJO RIESGO" if datos['prob_default'] < 0.06 else ("MODERADO" if datos['prob_default'] < 0.12 else "ALTO RIESGO")
-        tarjeta_kpi("Probabilidad de Default (Pd)", f"{datos['prob_default']*100:.2f}%", f"Nivel: {nivel_pd}")
-    with k3:
-        tarjeta_kpi("Ratio Cobertura Deuda", f"{datos['ratio_cobertura_calc']}x", "Mínimo exigido: 1.20x")
-    with k4:
-        if datos['estatus_dictamen'] == "RECHAZADO":
-            tarjeta_kpi("Tasa Mensual Sugerida", "N/A", "Operación Inviable")
-        else:
-            tarjeta_kpi("Tasa de Indiferencia", f"{datos['tasa_mensual_asignada']}% mensual", f"{datos['tasa_anual_asignada']}% anualizada")
+    with k1: st.metric("Score Crediticio", f"{datos['score_crediticio']} pts")
+    with k2: st.metric("Probabilidad de Default (PD)", f"{datos['prob_default']*100:.2f}%")
+    with k3: st.metric("Ratio Cobertura", f"{datos['ratio_cobertura_calc']}x")
+    with k4: 
+        if datos['estatus_dictamen'] == "RECHAZADO": st.metric("Tasa de Indiferencia", "N/A")
+        else: st.metric("Tasa de Indiferencia Asignada", f"{datos['tasa_mensual_asignada']}% mes")
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    nombre_arch = archivo_kyc.name if archivo_kyc else "Archivo temporal"
     if datos['estatus_dictamen'] == "RECHAZADO":
-        dictamen("peligro", "Dictamen: SOLICITUD RECHAZADA POR RIESGO ACTUARIAL", 
-                 f"El modelo algorítmico determina una Probabilidad de Incumplimiento del **{datos['prob_default']*100:.2f}%** (Score: **{datos['score_crediticio']}**). La relación de cobertura de deuda de **{datos['ratio_cobertura_calc']}x** y el nivel de apalancamiento no cumplen con los parámetros del umbral de solvencia. Autorizar esta colocación generaría un valor patrimonial negativo para el fondo.")
+        dictamen("peligro", "SOLICITUD RECHAZADA POR RIESGO", "El perfil no supera los parámetros de viabilidad de la SOFOM.")
     else:
-        dictamen("exito", f"Dictamen: SOLICITUD {datos['estatus_dictamen']}", 
-                 f"El perfil evaluado acredita solvencia técnica con un Score de **{datos['score_crediticio']}** y una Probabilidad de Incumplimiento de **{datos['prob_default']*100:.2f}%**. Para garantizar la rentabilidad operativa del 20% y el rendimiento del capital social, la **Tasa de Indiferencia asignada es de {datos['tasa_mensual_asignada']}% mensual** ({datos['tasa_anual_asignada']}% anual). Documento KYC auditable: {nombre_arch}.")
-
+        dictamen("exito", f"SOLICITUD {datos['estatus_dictamen']}", "El perfil acredita solvencia. Tasa calculada exitosamente.")
+        
         st.markdown("<br>", unsafe_allow_html=True)
-        titulo_seccion("documento_check", "4. Formalización y Alta en Cartera de Préstamos")
-        st.markdown("Al confirmar la colocación, el sistema registrará el crédito en el servidor y habilitará la emisión de pagarés y tablas de amortización con la tasa actuarial asignada.")
+        titulo_seccion("documento_check", "FORMALIZACIÓN Y CHECKLIST PLD")
         
-        col_conf1, col_conf2 = st.columns([1, 2])
-        with col_conf1:
-            # 1. BOTÓN INSTITUCIONAL: Ahora dice la verdad de lo que hace en esta etapa
-            btn_guardar_prestamo = st.button("Aprobar Solicitud y Enviar a Estructuración", width="stretch", type="primary")
-        
-        if btn_guardar_prestamo:
-            with st.spinner("Subiendo expediente a bóveda y turnando a Mesa de Estructuración..."):
-                info_doc = "Sin documento adjunto"
-                if archivo_kyc is not None:
-                    try:
-                        nombre_archivo_storage = f"kyc/{datos['rfc_cliente']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-                        file_bytes = archivo_kyc.getvalue()
-                        supabase.storage.from_("expedientes").upload(
-                            path=nombre_archivo_storage,
-                            file=file_bytes,
-                            file_options={"content-type": "application/pdf", "upsert": "true"}
-                        )
-                        info_doc = f"Storage: {nombre_archivo_storage}"
-                        st.toast("Expediente PDF guardado en la nube.", icon="📁")
-                    except Exception as e_storage:
-                        st.warning(f"Aviso de nube: El PDF no se pudo subir ({str(e_storage)}), pero el préstamo SÍ se registrará.")
-                        info_doc = f"Local: {archivo_kyc.name}"
-
-                try:
-                    fecha_corte_actual = datetime.now()
-                    dias_periodo = 15 if datos['frecuencia_pago'] == "Quincenal" else 30
-                    fecha_primer_vencimiento = fecha_corte_actual + timedelta(days=dias_periodo)
-                    
-                    payload_prestamo = {
-                        "id_cliente": str(datos['rfc_cliente']).strip(),
-                        "cliente": str(datos['nombre_cliente']).strip(),
-                        "rfc": str(datos['rfc_cliente']).strip(),
-                        "monto": float(datos['monto_solicitado']),
-                        "monto_principal": float(datos['monto_solicitado']), # Blindaje contra esquemas viejos
-                        "saldo_pendiente": float(datos['monto_solicitado']),
-                        "plazo_meses": int(datos['plazo_meses']),
-                        "frecuencia": str(datos['frecuencia_pago']),
-                        "tasa_mensual": float(datos['tasa_mensual_asignada']),
-                        "tasa_anual": float(datos['tasa_anual_asignada']),
-                        "score_asignado": int(datos['score_crediticio']),
-                        "probabilidad_default": round(float(datos['prob_default']), 4),
-                        "estatus": "APROBADO", # <--- 2. LA CLAVE: Nace como "APROBADO", esperando su tabla de pagos
-                        "fecha_otorgamiento": fecha_corte_actual.strftime("%Y-%m-%d"),
-                        "proximo_vencimiento": fecha_primer_vencimiento.strftime("%Y-%m-%d"),
-                        "gestor_originador": f"{usuario_actual} | {info_doc}"
-                    }
-                    
-                    # Inserción en SQL
-                    supabase.table("prestamos").insert(payload_prestamo).execute()
-                    
-                    # 3. MENSAJES CONGRUENTES: Ahora mandamos al ejecutivo al paso correcto (Módulo 2)
-                    st.success(f"¡Visto Bueno Actuarial! La solicitud para **{datos['nombre_cliente']}** fue aprobada e inscrita en el servidor.")
-                    st.info("**Siguiente paso del pipeline:** Ve a la pestaña **2. Amortización**. Ahí aparecerá este cliente disponible en la lista para calcular su calendario de cuotas y anexarlo.")
-                    
-                    # Limpiamos la memoria para que quede listo para el siguiente cliente
-                    del st.session_state["dictamen_evaluado"]
-                    
-                except Exception as e_sql:
-                    st.error(f"ERROR SQL AL GUARDAR EN SUPABASE: {str(e_sql)}")
-                    st.write("Datos exactos que intentaron entrar:", payload_prestamo)
+        with st.form("form_alta_credito"):
+            st.markdown("**Checklist de Integración Normativa (Artículo 115 LVIC):**")
+            chk_ine = st.checkbox("Identificación Oficial Vigente del Titular cotejada y validada.")
+            chk_dom = st.checkbox("Comprobante de Domicilio legal no mayor a 3 meses validado.")
+            chk_ingreso = st.checkbox("Comprobante de Ingresos / Estados de Cuenta cotejados.")
+            
+            # Botón final alineado con las observaciones del Auditor (Inserción Limpia)
+            btn_guardar_prestamo = st.form_submit_button("Turnar Expediente a Mesa de Aprobación", type="primary", width="stretch")
+            
+            if btn_guardar_prestamo:
+                if not (chk_ine and chk_dom and chk_ingreso):
+                    st.error("BLOQUEO PLD: El Oficial de Crédito debe validar físicamente la existencia de todos los documentos del checklist normativo.")
+                else:
+                    with st.spinner("Creando Identidad de Cliente e Inscribiendo Crédito (Transacción ACID)..."):
+                        try:
+                            rfc_target = str(datos['rfc_cliente']).strip()
+                            # 1. INSERCIÓN O ACTUALIZACIÓN EN TABLA CLIENTES (La fuente única de verdad del usuario)
+                            payload_cliente = {
+                                "rfc": rfc_target,
+                                "nombre_completo": str(datos['nombre_cliente']).strip(),
+                                "ingreso_neto_mensual": float(datos['ingreso_neto_mensual']),
+                                "puntaje_buro": int(datos['score_crediticio']),
+                                "estatus_admision": "VERIFICADO_PLD"
+                            }
+                            # Upsert: Si el RFC ya existe, actualiza los datos. Si no, lo crea.
+                            res_cliente = supabase.table("clientes").upsert(payload_cliente, on_conflict="rfc").execute()
+                            
+                            # Intentamos obtener el id_cliente (UUID real). Si el upsert no lo devuelve, lo buscamos.
+                            id_cliente_real = None
+                            if res_cliente.data:
+                                id_cliente_real = res_cliente.data[0].get("id_cliente")
+                            if not id_cliente_real:
+                                res_busq = supabase.table("clientes").select("id_cliente").eq("rfc", rfc_target).execute()
+                                id_cliente_real = res_busq.data[0]["id_cliente"] if res_busq.data else None
+                                
+                            if not id_cliente_real:
+                                st.error("Error crítico: No se pudo enlazar o crear el expediente del cliente en la base de datos principal.")
+                            else:
+                                # 2. INSERCIÓN EN TABLA PRESTAMOS (Súper limpia, sin duplicados)
+                                payload_prestamo = {
+                                    "id_cliente": str(id_cliente_real), # <--- LLAVE FORÁNEA PURA
+                                    "monto_principal": float(datos['monto_solicitado']),
+                                    "tasa_interes_mensual": float(datos['tasa_mensual_asignada']),
+                                    "plazo_quincenas": int(datos['plazo_quincenas']),
+                                    "estatus": "APROBADO", # Nace aprobado (o PENDIENTE_APROBACION en flujos más estrictos)
+                                    "fecha_desembolso": None # Aún no hay dinero entregado
+                                }
+                                
+                                supabase.table("prestamos").insert(payload_prestamo).execute()
+                                
+                                st.success("Expediente de Identidad Creado y Crédito Autorizado por el Comité.")
+                                st.info("Siguiente Paso: Transición al Módulo 2 (Amortización) para formalizar el calendario.")
+                                del st.session_state["dictamen_evaluado"]
+                                
+                        except Exception as e_sql:
+                            st.error(f"Fallo en transacción de Base de Datos: {str(e_sql)}")
