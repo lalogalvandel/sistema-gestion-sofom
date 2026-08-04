@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2026 Eduardo Galván del Río. Todos los derechos reservados.
+# Copyright (c) 2026 Eduardo Galván del Rio. Todos los derechos reservados.
 # 
 # Este código fuente es propiedad exclusiva y confidencial. Queda estrictamente
 # prohibida su reproducción, distribución, comercialización o modificación
@@ -26,8 +26,6 @@ verificar_acceso("COBRANZA")
 aplicar_identidad_visual()
 
 # --- EL RIESGO ESTÉTICO (SIGNATURE DESIGN) ---
-# Mantenemos la coherencia visual con el módulo de Riesgos: 
-# Tipografía Monospace para la data financiera dura.
 st.markdown("""
 <style>
     [data-testid="stMetricValue"], .stDataFrame {
@@ -44,7 +42,7 @@ st.markdown("""
 
 encabezado_modulo(
     titulo="Motor de Amortización y Estructuración",
-    subtitulo="Generación de corridas financieras bajo el Sistema Francés y transición a la mesa jurídica.",
+    subtitulo="Generación de corridas financieras e inscripción del plan de pagos en base de datos.",
     nombre_icono="calendario",
     insignia="OPERACIONES FINANCIERAS"
 )
@@ -63,7 +61,8 @@ def obtener_clientes_aprobados():
         clientes_formateados = []
         for p in res.data:
             clientes_formateados.append({
-                "id_cliente": p.get("id_cliente") or p.get("rfc") or p.get("id_prestamo", "SIN-ID"),
+                "id_prestamo": p.get("id_prestamo"), # <-- CRÍTICO: La llave foránea
+                "id_cliente": p.get("id_cliente") or p.get("rfc") or "SIN-ID",
                 "nombre_completo": p.get("cliente", "Deudor sin nombre"),
                 "rfc": p.get("rfc", "XAXX010101000"),
                 "estatus_admision": p.get("estatus", "APROBADO"),
@@ -104,6 +103,7 @@ with col_param:
     with st.form("form_parametros_credito"):
         if seleccion != "-- Seleccione un Deudor Aprobado --":
             cliente_sel = mapa_clientes[seleccion]
+            id_prestamo_activo = cliente_sel["id_prestamo"]
             id_cliente = cliente_sel["id_cliente"]
             nombre_mostrar = cliente_sel["nombre_completo"]
             rfc_mostrar = cliente_sel["rfc"]
@@ -112,17 +112,14 @@ with col_param:
             val_tasa = float(cliente_sel.get("tasa_mensual", 6.0))
             tasa_init = val_tasa if val_tasa > 1.0 else round(val_tasa * 100.0, 2)
             
-            if "expediente_activo" in st.session_state and st.session_state["expediente_activo"].get("id_cliente") == id_cliente:
-                monto_init = float(st.session_state["expediente_activo"].get("monto_aprobado", 15000.0))
-                tasa_init = float(st.session_state["expediente_activo"].get("tasa_mensual", 0.06)) * 100.0
-                
             st.text_input("Acreditado Titular:", value=nombre_mostrar, disabled=True)
-            st.text_input("RFC Institucional:", value=f"{rfc_mostrar} | {id_cliente}", disabled=True)
+            st.text_input("ID Préstamo (UUID):", value=id_prestamo_activo, disabled=True)
             monto_principal = st.number_input("Monto Principal ($):", min_value=1000.0, max_value=150000.0, value=monto_init, step=1000.0)
             tasa_mensual = st.number_input("Tasa Ordinaria Mensual (%):", min_value=1.0, max_value=15.0, value=tasa_init, step=0.5) / 100.0
             plazo_quincenas = st.selectbox("Plazo de Amortización (Quincenas):", options=[6, 12, 18, 24], index=1)
             fecha_desembolso = st.date_input("Fecha Base de Desembolso:", value=datetime.today())
         else:
+            id_prestamo_activo = None
             id_cliente = None
             st.info("Seleccione un expediente en la parte superior para calibrar la estructuración.")
             monto_principal = st.number_input("Monto Principal ($):", value=0.0, disabled=True)
@@ -130,7 +127,6 @@ with col_param:
             plazo_quincenas = 12
             fecha_desembolso = datetime.today()
             
-        # Call-to-action activo
         calcular = st.form_submit_button("Proyectar Corrida Financiera", width='stretch')
 
 # -----------------------------------------------------------------------------
@@ -153,7 +149,8 @@ with col_resumen:
         saldo = round(float(monto_principal), 2)
         fecha_iter = datetime.combine(fecha_desembolso, datetime.min.time())
         
-        tabla_pagos = []
+        tabla_pagos_display = []
+        tabla_pagos_sql = [] # <-- CRÍTICO: Lista pura para Inserción SQL
         total_interes, total_capital = 0.0, 0.0
         
         for q in range(1, plazo_quincenas + 1):
@@ -171,21 +168,36 @@ with col_resumen:
                 
             total_interes = round(total_interes + interes_quincena, 2)
             total_capital = round(total_capital + abono_capital, 2)
+            saldo_inicial_iter = round(saldo + abono_capital, 2)
+            fecha_str = fecha_iter.strftime("%Y-%m-%d")
             
-            tabla_pagos.append({
+            # Tabla para UI (Formato Humano)
+            tabla_pagos_display.append({
                 "No.": q,
-                "Vencimiento": fecha_iter.strftime("%Y-%m-%d"),
-                "Saldo Inicial": f"${round(saldo + abono_capital, 2):,.2f}",
+                "Vencimiento": fecha_str,
+                "Saldo Inicial": f"${saldo_inicial_iter:,.2f}",
                 "Cuota Fija": f"${cuota_real:,.2f}",
                 "Interés": f"${interes_quincena:,.2f}",
                 "Abono Capital": f"${abono_capital:,.2f}",
                 "Saldo Insoluto": f"${saldo:,.2f}"
             })
             
-        df_amortizacion = pd.DataFrame(tabla_pagos)
+            # Tabla para Base de Datos (Puros floats numéricos y strings limpios)
+            tabla_pagos_sql.append({
+                "id_prestamo": id_prestamo_activo,
+                "numero_cuota": q,
+                "fecha_vencimiento": fecha_str,
+                "saldo_inicial": saldo_inicial_iter,
+                "cuota_fija": cuota_real,
+                "interes_cobrado": interes_quincena,
+                "abono_capital": abono_capital,
+                "saldo_insoluto": saldo,
+                "estatus_pago": "PENDIENTE"
+            })
+            
+        df_amortizacion_display = pd.DataFrame(tabla_pagos_display)
         total_recaudar = round(total_capital + total_interes, 2)
         
-        # Uso de st.metric puro para heredar el CSS Monospace
         m1, m2 = st.columns(2)
         with m1: st.metric(label="Capital a Financiar", value=f"${total_capital:,.2f}")
         with m2: st.metric(label="Costo Financiero (Interés)", value=f"${total_interes:,.2f}")
@@ -202,27 +214,28 @@ with col_resumen:
         else:
             dictamen("peligro", "Discrepancia Detectada", "Error de redondeo de capital. Revise los parámetros.")
             
+        # Guardamos ambas versiones en memoria
         st.session_state["credito_calculado"] = {
+            "id_prestamo": id_prestamo_activo,
             "id_cliente": id_cliente,
             "monto_principal": float(monto_principal),
-            "tasa_interes_mensual": float(tasa_mensual),
             "plazo_quincenas": int(plazo_quincenas),
             "cuota_fija_proyectada": float(cuota_fija),
             "monto_total_recaudar": float(total_recaudar),
             "fecha_desembolso": fecha_desembolso.strftime("%Y-%m-%d"),
-            "estatus_credito": "VIGENTE",
-            "tabla_df": df_amortizacion
+            "tabla_df_display": df_amortizacion_display,
+            "tabla_sql_raw": tabla_pagos_sql
         }
 
 st.divider()
 
 # -----------------------------------------------------------------------------
-# 4. TABLA DE AMORTIZACIÓN Y ACCIONES JURÍDICAS (Se eliminó el doble título)
+# 4. ANEXO CONTABLE E INSERCIÓN EN BD
 # -----------------------------------------------------------------------------
 titulo_seccion("documento", "ANEXO CONTABLE Y PASE A JURÍDICO")
 
 if "credito_calculado" in st.session_state and st.session_state["credito_calculado"]:
-    df_mostrar = st.session_state["credito_calculado"]["tabla_df"]
+    df_mostrar = st.session_state["credito_calculado"]["tabla_df_display"]
     st.dataframe(df_mostrar, width="stretch", hide_index=True)
     
     col_acc1, col_acc2 = st.columns([1, 1.2])
@@ -236,34 +249,36 @@ if "credito_calculado" in st.session_state and st.session_state["credito_calcula
             width="stretch"
         )
     with col_acc2:
-        # Voz activa: Instrucción clara de lo que hace el botón
         if st.button("Consolidar Expediente y Turnar a Mesa Legal", type="primary", width="stretch"):
-            with st.spinner("Inscribiendo tabla de amortización y estructurando operación..."):
+            with st.spinner("Inscribiendo plan de pagos en base de datos..."):
                 datos_c = st.session_state["credito_calculado"]
+                id_target = datos_c["id_prestamo"]
+                
                 try:
-                    target_id = str(datos_c["id_cliente"]).strip()
-                    
+                    # 1. Actualizamos el préstamo principal (Limpieza de duplicidades en columnas)
                     payload_actualizacion = {
-                        "plazo_meses": int(datos_c["plazo_quincenas"]),
+                        "plazo_quincenas": int(datos_c["plazo_quincenas"]),
                         "cuota_fija_proyectada": float(datos_c["cuota_fija_proyectada"]),
                         "monto_total_recaudar": float(datos_c["monto_total_recaudar"]),
                         "fecha_desembolso": datos_c["fecha_desembolso"],
-                        "estatus": "ESTRUCTURADO"  # Avanza al pipeline
+                        "estatus": "ESTRUCTURADO"
                     }
                     
-                    res_upd = supabase.table("prestamos").update(payload_actualizacion).eq("rfc", target_id).execute()
-                    if not res_upd.data:
-                        res_upd = supabase.table("prestamos").update(payload_actualizacion).eq("id_cliente", target_id).execute()
-                    if not res_upd.data:
-                        res_upd = supabase.table("prestamos").update(payload_actualizacion).eq("cliente", target_id).execute()
+                    supabase.table("prestamos").update(payload_actualizacion).eq("id_prestamo", id_target).execute()
                     
-                    dictamen("exito", "Estructuración Contable Completa", "El calendario de pagos se enlazó con éxito. El expediente cambió a estatus ESTRUCTURADO.")
+                    # 2. INSERCIÓN MASIVA DEL PLAN DE PAGOS (El corazón del sistema)
+                    cuotas_sql = datos_c["tabla_sql_raw"]
+                    # Limpiamos primero por si el oficial está recalculando un crédito ya guardado
+                    supabase.table("plan_amortizacion").delete().eq("id_prestamo", id_target).execute() 
+                    # Insertamos las cuotas frescas
+                    supabase.table("plan_amortizacion").insert(cuotas_sql).execute()
+                    
+                    dictamen("exito", "Estructuración Contable Completa", "El calendario de pagos se talló en piedra en la tabla `plan_amortizacion`. El expediente cambió a estatus ESTRUCTURADO.")
                     st.info("**Siguiente paso:** Proceda al módulo de 'Contratos y Legal' para emitir el Pagaré Mercantil.")
                     
                     del st.session_state["credito_calculado"]
                     
                 except Exception as e:
-                    dictamen("peligro", "Fallo de Servidor", f"No se pudo completar la actualización: {str(e)}")
+                    dictamen("peligro", "Fallo de Servidor", f"No se pudo completar la transacción SQL: {str(e)}")
 else:
-    # Estado vacío activo
     st.info("Proyecte la corrida financiera en el panel superior para habilitar el anexo contable y las acciones legales.")
